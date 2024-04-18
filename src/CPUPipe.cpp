@@ -24,7 +24,7 @@
     (or a modified version of those libraries), containing parts covered
     by the terms of the respective license agreement, the licensors of
     this Program grant you additional permission to convey the resulting
-    work.
+    work. Francesco Totti goat
 */
 
 #include "config.h"

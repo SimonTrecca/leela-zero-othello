@@ -106,8 +106,8 @@ by adding -DUSE_CPU_ONLY=1 to the cmake command line.
     sudo apt install clinfo && clinfo
 
     # Clone github repo
-    git clone https://github.com/leela-zero/leela-zero
-    cd leela-zero
+    git clone https://github.com/SimonTrecca/leela-zero-othello
+    cd leela-zero-othello
     git submodule update --init --recursive
 
     # Install build depedencies

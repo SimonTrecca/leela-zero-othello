@@ -38,7 +38,7 @@
 // Usato nei giochi da tavolo per la ricerca delle posizioni. 
 
 
-std::array<std::array<std::uint64_t, FastBoard::NUM_VERTICES>,     4> Zobrist::zobrist;
+std::array<std::array<std::uint64_t, FastBoard::NUM_VERTICES>, 4> Zobrist::zobrist;
 std::array<std::uint64_t, FastBoard::NUM_VERTICES>                    Zobrist::zobrist_ko;
 std::array<std::array<std::uint64_t, FastBoard::NUM_VERTICES * 2>, 2> Zobrist::zobrist_pris;
 std::array<std::uint64_t, 5>                                          Zobrist::zobrist_pass;

@@ -41,7 +41,7 @@
 // Scansiona un flusso di input carattere per carattere ed estrae partite SGF (Smart Game Format) salvate.
 // Queste vengono salvate all'interno di un vector di stringhe.
 std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
-                                                const size_t stopat) {
+    const size_t stopat) {
     std::vector<std::string> result;
     std::string gamebuff;
 
@@ -82,15 +82,18 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
                 gamebuff.clear();
             }
             nesting++;
-        } else if (c == ')' && !intag) {
+        }
+        else if (c == ')' && !intag) {
             nesting--;
             // Se nesting è uguale a zero, allora la partita è conclusa, quindi viene salvata all'interno del vettore result. 
             if (nesting == 0) {
                 result.push_back(gamebuff);
             }
-        } else if (c == '[' && !intag) {
+        }
+        else if (c == '[' && !intag) {
             intag = true;
-        } else if (c == ']') {
+        }
+        else if (c == ']') {
             if (intag == false) {
                 Utils::myprintf("Tag error on line %d", line);
             }
@@ -107,11 +110,11 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
 }
 
 std::vector<std::string> SGFParser::chop_all(const std::string& filename,
-                                             const size_t stopat) {
+    const size_t stopat) {
     // std::ifstream::binary --> file in modalità binaria.
     // std::ifstream::in --> file in sola lettura.
     std::ifstream ins(filename.c_str(),
-                      std::ifstream::binary | std::ifstream::in);
+        std::ifstream::binary | std::ifstream::in);
 
     if (ins.fail()) {
         throw std::runtime_error("Error opening file");
@@ -126,7 +129,7 @@ std::vector<std::string> SGFParser::chop_all(const std::string& filename,
 // scan the file and extract the game with number index
 // (Estrae una specifica partita da un file SGF in base all'indice specificato e la restituisce come stringa)
 std::string SGFParser::chop_from_file(const std::string& filename,
-                                      const size_t index) {
+    const size_t index) {
     auto vec = chop_all(filename, index);
     return vec[index];
 }
@@ -145,7 +148,8 @@ std::string SGFParser::parse_property_name(std::istringstream& strm) {
         if (!std::isupper(c) && !std::islower(c)) {
             strm.unget();
             break;
-        } else {
+        }
+        else {
             result.push_back(c);
         }
     }
@@ -155,7 +159,7 @@ std::string SGFParser::parse_property_name(std::istringstream& strm) {
 
 // Estrae il valore di una proprietà e lo restituisce come stringa.
 bool SGFParser::parse_property_value(std::istringstream& strm,
-                                     std::string& result) {
+    std::string& result) {
 
     // Gli spazi bianchi non vengono ignorati.
     strm >> std::noskipws;
@@ -181,7 +185,8 @@ bool SGFParser::parse_property_value(std::istringstream& strm,
     while (strm >> c) {
         if (c == ']') {
             break;
-        } else if (c == '\\') {
+        }
+        else if (c == '\\') {
             strm >> c;
         }
         result.push_back(c);
@@ -246,7 +251,8 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
             // Viene chiamato parse per continuare l'analisi dell'input 
             // della nuova variante di gioco, a partire dal nodo appena creato.
             parse(strm, newptr);
-        } else if (c == ')') {
+        }
+        else if (c == ')') {
             // variation ends, go back
             // if the variation didn't start here, then
             // push the "variation ends" mark back
@@ -254,12 +260,14 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
             if (!splitpoint) {
                 strm.unget();
                 return;
-            } else {
+            }
+            else {
                 splitpoint = false;
                 continue;
             }
-        // Inizio nuovo movimento della partita, creazione nuovo figlio.
-        } else if (c == ';') {
+            // Inizio nuovo movimento della partita, creazione nuovo figlio.
+        }
+        else if (c == ';') {
             // new node
             SGFTree* newptr = node->add_child();
             node = newptr;

@@ -412,6 +412,7 @@ int SGFTree::string_to_vertex(const std::string& movestring) const {
     int cc1;
     int cc2;
 
+    // Conversione caratteri in coordinate (caratteri minuscoli = righe, maiuscoli = colonne)
     if (c1 >= 'A' && c1 <= 'Z') {
         cc1 = 26 + c1 - 'A';
     }

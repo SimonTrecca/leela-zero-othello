@@ -341,9 +341,14 @@ void SGFTree::copy_state(const SGFTree& tree) {
     m_timecontrol_ptr = tree.m_timecontrol_ptr;
 }
 
+// Verifica la validità della mossa per poi applicarla.
 void SGFTree::apply_move(const int color, const int move) {
+    // Controlla che non sia un passaggio o un abbandono.
     if (move != FastBoard::PASS && move != FastBoard::RESIGN) {
+        // Salva lo stato della partita attuale.
         auto vtx_state = m_state.board.get_state(move);
+        // Controlla se il punto della scacchiera è occupato dal colore opposto a quello che sta giocando
+        // oppure se è in un punto non valido.
         if (vtx_state == !color || vtx_state == FastBoard::INVAL) {
             throw std::runtime_error("Illegal move");
         }
@@ -366,6 +371,7 @@ void SGFTree::add_property(std::string property, std::string value) {
     m_properties.emplace(property, value);
 }
 
+// Crea un nodo figlio alla fine del vettore m_children.
 SGFTree* SGFTree::add_child() {
     // first allocation is better small
     if (m_children.size() == 0) {

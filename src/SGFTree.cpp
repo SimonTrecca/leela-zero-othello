@@ -59,11 +59,13 @@ void SGFTree::init_state() {
     m_state.init_game(std::min(BOARD_SIZE, 19), KOMI);
 }
 
+// Fornisce lo stato corrente del gioco.
 const KoState* SGFTree::get_state() const {
     assert(m_initialized);
     return &m_state;
 }
 
+// Restituisce il puntatore al figlio corrispondente all'indice fornito (count).
 const SGFTree* SGFTree::get_child(const size_t count) const {
     if (count < m_children.size()) {
         assert(m_initialized);
@@ -82,6 +84,8 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
     // sets up the game history.
     GameState result(get_state());
 
+    // Se è stato definito un controllo di tempo, esso deve essere applicato 
+    // anche allo stato di gioco rappresentato da result.
     if (m_timecontrol_ptr) {
         result.set_timecontrol(*m_timecontrol_ptr);
     }
@@ -89,8 +93,14 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
     for (unsigned int i = 0; i <= movenum && link != nullptr; i++) {
         // root position has no associated move
         if (i != 0) {
+            // Ottiene la mossa del nodo link
             auto colored_move = link->get_colored_move();
+            // Controlla che il colore sia valido
             if (colored_move.first != FastBoard::INVAL) {
+                // Vengono effettuati tre controlli sulla coordinata della mossa:
+                // 1) la mossa deve essere diversa da PASS.
+                // 2) viene controllata la coordinata, evitando che venga eseguita una mossa su una cella non libera.
+                // 3) viene controllato lo stato della partita, assicurando che non venga eseguita una mossa su una cella non libera.
                 if (colored_move.second != FastBoard::PASS
                     && colored_move.second != FastBoard::EMPTY
                     && result.board.get_state(colored_move.second)
@@ -98,15 +108,19 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
                     // Fail loading
                     return result;
                 }
+                // Mossa valida, viene giocata sullo stato del gioco result.
                 result.play_move(colored_move.first, colored_move.second);
             }
         }
+        // Link viene passato sul primo figlio del nodo corrente.
+        // Si continua a seguire la linea principale dell'albero.
         link = link->get_child(0);
     }
 
     return result;
 }
 
+// load a game from a file
 void SGFTree::load_from_string(const std::string& gamebuff) {
     std::istringstream pstream(gamebuff);
 
@@ -136,6 +150,8 @@ void SGFTree::populate_states() {
     auto has_handicap = false;
 
     // first check for go game setup in properties
+    // Verifica se il gioco è di tipo Go.
+    // Se è Go ma manca la dimensione della scacchiera (SZ), viene inserita la dimensione standard di 19x19
     it = m_properties.find("GM");
     if (it != end(m_properties)) {
         if (it->second != "1") {
@@ -150,12 +166,16 @@ void SGFTree::populate_states() {
     }
 
     // board size
+    // Si cerca la dimensione della scacchiera nel file SGF.
     it = m_properties.find("SZ");
+    // Se viene trovata, viene convertita da stringa ad intero.
     if (it != end(m_properties)) {
         const auto size = it->second;
         std::istringstream strm(size);
         int bsize;
         strm >> bsize;
+        // Controlla se la dimensione trovata è uguale a quella definita da BOARD_SIZE
+        // Se è valida, viene inizializzato il gioco con essa + valore di KOMI di default
         if (bsize == BOARD_SIZE) {
             // Assume default komi in config.h if not specified
             m_state.init_game(bsize, KOMI);
@@ -165,7 +185,9 @@ void SGFTree::populate_states() {
         }
     }
 
-    // komi
+    // Gestione Komi: punti dati al secondo giocatore per lo svantaggio (non aver iniziato per primo).
+    // Viene cercato il valore di Komi dentro il file, convertito in virgola mobile e utilizzato per
+    // inizializzare la partita insieme alla dimensione della scacchiera (se valida).
     it = m_properties.find("KM");
     if (it != end(m_properties)) {
         const auto foo = it->second;
@@ -187,6 +209,12 @@ void SGFTree::populate_states() {
     }
 
     // time
+    // Vengono cercati tempo principale e altre proprietà relative al controllo del tempo.
+    // OT: tempo extra per mossa
+    // BL: tempo rimasto al giocatore nero
+    // WL: tempo rimasto al giocatore bianco
+    // OB: mosse rimaste al giocatore nero
+    // OW: mosse rimaste al giocatore bianco
     it = m_properties.find("TM");
     if (it != end(m_properties)) {
         const auto maintime = it->second;
@@ -204,12 +232,14 @@ void SGFTree::populate_states() {
         it = m_properties.find("OW");
         const auto white_moves_left =
             (it != end(m_properties)) ? it->second : "";
+        // Viene creato un oggetto TimeControl con le varie informazioni
         m_timecontrol_ptr = TimeControl::make_from_text_sgf(
             maintime, byoyomi, black_time_left, white_time_left,
             black_moves_left, white_moves_left);
     }
 
     // handicap
+    // Se è presente l'handicap (maggiore di 0), esso viene impostato come handicap del gioco.
     it = m_properties.find("HA");
     if (it != end(m_properties)) {
         const auto size = it->second;
@@ -221,6 +251,8 @@ void SGFTree::populate_states() {
     }
 
     // result
+    // Se la stringa result contiene la parola "Time" il risultato non è disponibile (EMPTY).
+    // Se inizia con "W+" o "B+" si ha un vincitore, mentre se non contiene nessuna di queste è invalido.
     it = m_properties.find("RE");
     if (it != end(m_properties)) {
         const auto result = it->second;
@@ -243,10 +275,14 @@ void SGFTree::populate_states() {
     }
 
     // handicap stones
+    // Assegna le pietre di handicap del giocatore nero. 
     auto prop_pair_ab = m_properties.equal_range("AB");
     // Do we have a handicap specified but no handicap stones placed in
     // the same node? Then the SGF file is corrupt. Let's see if we can find
     // them in the next node, which is a common bug in some Go apps.
+    // 
+    // (Se ci sono handicap, ma non è specificato il valore, 
+    // allora si controlla il primo nodo figlio per cercarle)
     if (has_handicap && prop_pair_ab.first == prop_pair_ab.second) {
         if (!m_children.empty()) {
             auto& successor = m_children[0];
@@ -254,13 +290,14 @@ void SGFTree::populate_states() {
         }
     }
     // Loop through the stone list and apply
+    // Per ogni pietra di handicap viene estratta la posizione e viene piazzata.
     for (auto pit = prop_pair_ab.first; pit != prop_pair_ab.second; ++pit) {
         const auto move = pit->second;
         const auto vtx = string_to_vertex(move);
         apply_move(FastBoard::BLACK, vtx);
     }
 
-    // XXX: count handicap stones
+    // Assegna le pietre di handicap del giocatore bianco.
     const auto& prop_pair_aw = m_properties.equal_range("AW");
     for (auto pit = prop_pair_aw.first; pit != prop_pair_aw.second; ++pit) {
         const auto move = pit->second;
@@ -268,6 +305,7 @@ void SGFTree::populate_states() {
         apply_move(FastBoard::WHITE, vtx);
     }
 
+    // Controlla il colore del giocatore che deve fare la prossima mossa
     it = m_properties.find("PL");
     if (it != end(m_properties)) {
         const auto who = it->second;
@@ -279,6 +317,8 @@ void SGFTree::populate_states() {
     }
 
     // now for all children play out the moves
+    // Dopo aver copiato lo stato della partita al figlio, applica la sua mossa associata
+    // e procede ricorsivamente esplorando tutto il sotto-albero attraverso la funzione populate_states().
     for (auto& child_state : m_children) {
         // propagate state
         child_state.copy_state(*this);
@@ -294,6 +334,7 @@ void SGFTree::populate_states() {
     }
 }
 
+// Copia stato di inizializzazione, stato di gioco e puntatore al controllo del tempo.
 void SGFTree::copy_state(const SGFTree& tree) {
     m_initialized = tree.m_initialized;
     m_state = tree.m_state;

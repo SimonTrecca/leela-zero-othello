@@ -38,6 +38,8 @@
 #include "SGFTree.h"
 #include "Utils.h"
 
+// Scansiona un flusso di input carattere per carattere ed estrae partite SGF (Smart Game Format) salvate.
+// Queste vengono salvate all'interno di un vector di stringhe.
 std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
                                                 const size_t stopat) {
     std::vector<std::string> result;
@@ -45,18 +47,21 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
 
     ins >> std::noskipws;
 
-    int nesting = 0;    // parentheses
-    bool intag = false; // brackets
+    int nesting = 0;    // Gestione annidamento delle parentesi. 
+    bool intag = false; // Gestione situazione dei Tag. I tag vengono aperti con "[" e non possono contenere altre parentesi prima di essere chiusi con "]".
     int line = 0;
     gamebuff.clear();
 
     char c;
+    // Continua finchè non ci sono più caratteri da leggere, 
+    // oppure fino a quando il vettore result non raggiunge il limite definito da "stopat".
     while (ins >> c && result.size() <= stopat) {
         if (c == '\n') {
             line++;
         }
 
         gamebuff.push_back(c);
+        // Garantisce che il carattere successivo a '\\' NON venga letto come carattere speciale, bensì come carattere "normale".
         if (c == '\\') {
             // read literal char
             ins >> c;
@@ -65,6 +70,9 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
             continue;
         }
 
+        // Gestisce i caratteri parentesi tonde. Se non si è all'interno di un'altra parentesi tonda (nesting == 0), 
+        // gli spazi bianchi e i ';' vengono ignorati,ovvero vengono letti nel ciclo while e poi il gamebuff viene pulito. 
+        // In questo modo verranno registrate solamente le informazioni essenziali.
         if (c == '(' && !intag) {
             if (nesting == 0) {
                 // eat ; too
@@ -76,7 +84,7 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
             nesting++;
         } else if (c == ')' && !intag) {
             nesting--;
-
+            // Se nesting è uguale a zero, allora la partita è conclusa, quindi viene salvata all'interno del vettore result. 
             if (nesting == 0) {
                 result.push_back(gamebuff);
             }
@@ -100,6 +108,8 @@ std::vector<std::string> SGFParser::chop_stream(std::istream& ins,
 
 std::vector<std::string> SGFParser::chop_all(const std::string& filename,
                                              const size_t stopat) {
+    // std::ifstream::binary --> file in modalità binaria.
+    // std::ifstream::in --> file in sola lettura.
     std::ifstream ins(filename.c_str(),
                       std::ifstream::binary | std::ifstream::in);
 
@@ -114,12 +124,16 @@ std::vector<std::string> SGFParser::chop_all(const std::string& filename,
 }
 
 // scan the file and extract the game with number index
+// (Estrae una specifica partita da un file SGF in base all'indice specificato e la restituisce come stringa)
 std::string SGFParser::chop_from_file(const std::string& filename,
                                       const size_t index) {
     auto vec = chop_all(filename, index);
     return vec[index];
 }
 
+// Estrae il nome di una proprietà e lo restituisce come stringa.
+// Le proprietà sono rappresentate da coppie di valori (nome proprietà - contenuto proprietà) 
+// e forniscono informazioni sulla partita.
 std::string SGFParser::parse_property_name(std::istringstream& strm) {
     std::string result;
 
@@ -139,10 +153,14 @@ std::string SGFParser::parse_property_name(std::istringstream& strm) {
     return result;
 }
 
+// Estrae il valore di una proprietà e lo restituisce come stringa.
 bool SGFParser::parse_property_value(std::istringstream& strm,
                                      std::string& result) {
+
+    // Gli spazi bianchi non vengono ignorati.
     strm >> std::noskipws;
 
+    // Se c non è uno spazio bianco, il carattere viene rimesso nello stream di input.
     char c;
     while (strm >> c) {
         if (!std::isspace(c)) {
@@ -153,11 +171,13 @@ bool SGFParser::parse_property_value(std::istringstream& strm,
 
     strm >> c;
 
+    // Il primo carattere della proprietà deve essere ']', ovvero il carattere di apertura.
     if (c != '[') {
         strm.unget();
         return false;
     }
 
+    // I caratteri vengono letti finché la proprietà non viene chiusa con ']'.
     while (strm >> c) {
         if (c == ']') {
             break;
@@ -167,11 +187,13 @@ bool SGFParser::parse_property_value(std::istringstream& strm,
         result.push_back(c);
     }
 
+    // Gli spazi bianchi vengono ignorati.
     strm >> std::skipws;
 
     return true;
 }
 
+// Crea un albero SGF rappresentante la struttura della partita a partire da un flusso di input SGF.
 void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
     bool splitpoint = false;
 
@@ -186,7 +208,9 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
         }
 
         // parse a property
+        // Controlla se il carattere è alfabetico ed è maiuscolo.
         if (std::isalpha(c) && std::isupper(c)) {
+            // La proprietà viene salvata dal carattere successivo, quindi quello corrente viene scartato.
             strm.unget();
 
             std::string propname = parse_property_name(strm);
@@ -195,6 +219,8 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
             do {
                 std::string propval;
                 success = parse_property_value(strm, propval);
+                // Se l'analisi del valore ha successo, viene creato un nodo 
+                // contenente la proprietà e il ciclo do-while continua.
                 if (success) {
                     node->add_property(propname, propval);
                 }
@@ -206,6 +232,7 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
         if (c == '(') {
             // eat first ;
             char cc;
+            // Ignora spazi bianchi ed eventuale ';' successivo.
             do {
                 strm >> cc;
             } while (std::isspace(cc));
@@ -216,6 +243,8 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
             splitpoint = true;
             // new node
             SGFTree* newptr = node->add_child();
+            // Viene chiamato parse per continuare l'analisi dell'input 
+            // della nuova variante di gioco, a partire dal nodo appena creato.
             parse(strm, newptr);
         } else if (c == ')') {
             // variation ends, go back
@@ -229,6 +258,7 @@ void SGFParser::parse(std::istringstream& strm, SGFTree* node) {
                 splitpoint = false;
                 continue;
             }
+        // Inizio nuovo movimento della partita, creazione nuovo figlio.
         } else if (c == ';') {
             // new node
             SGFTree* newptr = node->add_child();

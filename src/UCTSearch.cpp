@@ -64,13 +64,13 @@ public:
     OutputAnalysisData(std::string move, const int visits, const float winrate,
                        const float policy_prior, std::string pv,
                        const float lcb, const bool lcb_ratio_exceeded)
-        : m_move(std::move(move)),
+        : m_move(std::move(move)),                  
           m_visits(visits),
           m_winrate(winrate),
-          m_policy_prior(policy_prior),
-          m_pv(std::move(pv)),
-          m_lcb(lcb),
-          m_lcb_ratio_exceeded(lcb_ratio_exceeded) {}
+          m_policy_prior(policy_prior),                 
+          m_pv(std::move(pv)),                              // Principal Variation (sequenza di mosse considerata migliore)
+          m_lcb(lcb),                                       // Lower Confidence Bound (stima della reale performance di una mossa)
+          m_lcb_ratio_exceeded(lcb_ratio_exceeded) {}       // Indica se il rapporto di lcb è stato superato
 
     std::string get_info_string(const int order) const {
         auto tmp = "info move " + m_move
@@ -82,13 +82,18 @@ public:
                  + " lcb "
                  + std::to_string(static_cast<int>(std::max(0.0f, m_lcb)
                                                    * 10000));
+        // Order viene aggiunto solo se maggiore di zero
         if (order >= 0) {
             tmp += " order " + std::to_string(order);
         }
+        // La stringa conterrà anche il percorso principale
         tmp += " pv " + m_pv;
         return tmp;
     }
 
+    // Prima confronta se i valori hanno superato lcb ratio.
+    // Se almeno uno non lo ha superato, confronta se hanno le stesse visite.
+    // In quel caso, controlla il winrate. Infine, se hanno visite diverse, controlla quelle.
     friend bool operator<(const OutputAnalysisData& a,
                           const OutputAnalysisData& b) {
         if (a.m_lcb_ratio_exceeded && b.m_lcb_ratio_exceeded) {
@@ -112,11 +117,15 @@ private:
     bool m_lcb_ratio_exceeded;
 };
 
+// Prende in input lo stato di gioco e un network.
+// Setta il numero massimo di playout e di visite.
+// Crea il nodo radice dell'albero di ricerca.
 UCTSearch::UCTSearch(GameState& g, Network& network)
     : m_rootstate(g), m_network(network) {
     set_playout_limit(cfg_max_playouts);
     set_visit_limit(cfg_max_visits);
 
+    
     m_root = std::make_unique<UCTNode>(FastBoard::PASS, 0.0f);
 }
 
@@ -126,6 +135,8 @@ bool UCTSearch::advance_to_new_rootstate() {
         return false;
     }
 
+    // Controlla se il valore del komi è cambiato tra il 
+    // precedente rootstate e quello attuale
     if (m_rootstate.get_komi() != m_last_rootstate->get_komi()) {
         return false;
     }
@@ -134,9 +145,12 @@ bool UCTSearch::advance_to_new_rootstate() {
         int(m_rootstate.get_movenum() - m_last_rootstate->get_movenum());
 
     if (depth < 0) {
+        // Profondità negativa tra la mossa corrente e quella precedente
         return false;
     }
 
+    // Annulla le mosse per tutta la profondità.
+    // Alla fine test conterrà lo stato di gioco della radice.
     auto test = std::make_unique<GameState>(m_rootstate);
     for (auto i = 0; i < depth; i++) {
         test->undo_move();
@@ -158,10 +172,15 @@ bool UCTSearch::advance_to_new_rootstate() {
     for (auto i = 0; i < depth; i++) {
         ThreadGroup tg(thread_pool);
 
+        // Test, che contiene lo stato della radice, fa una nuova mossa e aggiorna stato.
         test->forward_move();
+        // La mossa viene salvata.
         const auto move = test->get_last_move();
 
+        // La vecchia radice viene "spostata" dentro oldroot
         auto oldroot = std::move(m_root);
+        // Il nodo figlio della vecchia radice diventa la nuova radice.
+        // Il figlio è quello corrispondente alla mossa giocata.
         m_root = oldroot->find_child(move);
 
         // Lazy tree destruction.  Instead of calling the destructor of the
@@ -176,6 +195,7 @@ bool UCTSearch::advance_to_new_rootstate() {
             // Tree hasn't been expanded this far
             return false;
         }
+        // m_last_rootstate viene aggiornato con la mossa giocata.
         m_last_rootstate->play_move(move);
     }
 
@@ -195,9 +215,12 @@ void UCTSearch::update_root() {
     m_playouts = 0;
 
 #ifndef NDEBUG
+    // Viene registrato il numero di nodi nell'albero.
     auto start_nodes = m_root->count_nodes_and_clear_expand_state();
 #endif
 
+    // Se l'avanzamento alla nuova radice non riesce, oppure se la nuova
+    // radice è nulla, viene creato un nuovo nodo radice standard.
     if (!advance_to_new_rootstate() || !m_root) {
         m_root = std::make_unique<UCTNode>(FastBoard::PASS, 0.0f);
     }
@@ -217,6 +240,7 @@ void UCTSearch::update_root() {
 }
 
 float UCTSearch::get_min_psa_ratio() const {
+    // Controllo sulla memoria in base alla memoria massima dell'albero
     const auto mem_full =
         UCTNodePointer::get_tree_size() / static_cast<float>(cfg_max_tree_size);
     // If we are halfway through our memory budget, start trimming
@@ -249,6 +273,8 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
     } BOOST_SCOPE_EXIT_END
 
     if (node->expandable()) {
+        // Se il nodo è espandibile ma sono stati fatti più di 2 passaggi
+        // allora si interrompe e viene restituito il risultato fino a quel punto.
         if (currstate.get_passes() >= 2) {
             auto score = currstate.final_score();
             result = SearchResult::from_score(score);
@@ -260,6 +286,8 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
             // another thread requests draining the search.
             const auto success = node->create_children(
                 m_network, m_nodes, currstate, eval, get_min_psa_ratio());
+            // Il nodo non AVEVA figli e la creazione di un nuovo figlio ha avuto successo
+            // La simulazione termina e viene restituito il risultato.
             if (!had_children && success) {
                 result = SearchResult::from_eval(eval);
                 new_node = true;
@@ -267,14 +295,18 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
         }
     }
 
+    // Il nodo HA figli e non è stato restituito un risultato valido
+    // Viene selezionato il prossimo figlio da esplorare (quello migliore)
     if (node->has_children() && !result.valid()) {
         auto next = node->uct_select_child(color, node == m_root.get());
         auto move = next->get_move();
 
+        // La mossa viene eseguita
         currstate.play_move(move);
         if (move != FastBoard::PASS && currstate.superko()) {
             next->invalidate();
         } else {
+            // Ricorsione della simulazione
             result = play_simulation(currstate, next);
         }
     }
@@ -288,12 +320,16 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
 }
 
 void UCTSearch::dump_stats(const FastState& state, UCTNode& parent) {
+    // Non stampa nulla se la modalità "quiet" è attiva
+    // oppure se il padre non ha figli.
     if (cfg_quiet || !parent.has_children()) {
         return;
     }
 
     const int color = state.get_to_move();
 
+    // Scorre tutti i figli per determinare il numero 
+    // massimo di visite tra di essi (usato nel sorting)
     auto max_visits = 0;
     for (const auto& node : parent.get_children()) {
         max_visits = std::max(max_visits, node->get_visits());
@@ -302,11 +338,13 @@ void UCTSearch::dump_stats(const FastState& state, UCTNode& parent) {
     // sort children, put best move on top
     parent.sort_children(color, cfg_lcb_min_visit_ratio * max_visits);
 
+    // Nessuna simulazione eseguita sul primo figlio 
     if (parent.get_first_child()->first_visit()) {
         return;
     }
 
     int movecount = 0;
+    // Analizza tutti i figli del nodo padre.
     for (const auto& node : parent.get_children()) {
         // Always display at least two moves. In the case there is
         // only one move searched the user could get an idea why.
@@ -314,7 +352,9 @@ void UCTSearch::dump_stats(const FastState& state, UCTNode& parent) {
 
         auto move = state.move_to_text(node->get_move());
         auto tmpstate = FastState{state};
+        // Stato del gioco dopo che il figlio gioca la mossa
         tmpstate.play_move(node->get_move());
+        // Viene aggiunta la mossa alla pv
         auto pv = move + " " + get_pv(tmpstate, *node);
 
         myprintf("%4s -> %7d (V: %5.2f%%) (LCB: %5.2f%%) (N: %5.2f%%) PV: %s\n",
@@ -389,6 +429,8 @@ void UCTSearch::tree_stats(const UCTNode& node) {
     std::function<void(const UCTNode& node, size_t)> traverse =
         [&](const UCTNode& node, size_t depth) {
             nodes += 1;
+            // Incrementato solo se ha più di una visita (un nodo non 
+            // viene visitato più di una volta se è una foglia)
             non_leaf_nodes += node.get_visits() > 1;
             depth_sum += depth;
             if (depth > max_depth) max_depth = depth;
@@ -405,6 +447,8 @@ void UCTSearch::tree_stats(const UCTNode& node) {
             }
         };
 
+    // La funzione traverse parte dalla radice per poi 
+    // esplorarlo ricorsivamente
     traverse(node, 0);
 
     if (nodes > 0) {
@@ -431,13 +475,16 @@ bool UCTSearch::should_resign(const passflag_t passflag, const float besteval) {
     const auto move_threshold = num_intersections / 4;
     const auto movenum = m_rootstate.get_movenum();
     if (movenum <= move_threshold) {
-        // too early in game to resign
+        // too early in game to resign 
         return false;
     }
 
     const auto color = m_rootstate.board.get_to_move();
 
     const auto is_default_cfg_resign = cfg_resignpct < 0;
+    // Se la percentuale di resign è quella di default, il treshold sarà 
+    // il 10% di quel valore. Altrimenti, sarà uguale alla percentuale
+    // specificata dall'utente.
     const auto resign_threshold =
         0.01f * (is_default_cfg_resign ? 10 : cfg_resignpct);
     if (besteval > resign_threshold) {
@@ -445,12 +492,16 @@ bool UCTSearch::should_resign(const passflag_t passflag, const float besteval) {
         return false;
     }
 
+    // Controlla che ci sia handicap, che il colore attuale è bianco
+    // e che la percentuale di resign è quella di default.
     if ((m_rootstate.get_handicap() > 0) && (color == FastBoard::WHITE)
         && is_default_cfg_resign) {
+        // Resign threshold adattato data la presenza di handicap 
         const auto handicap_resign_threshold =
             resign_threshold / (1 + m_rootstate.get_handicap());
 
         // Blend the thresholds for the first ~215 moves.
+        // Garantische una transazione graduale tra i due valori di threshold
         auto blend_ratio = std::min(1.0f, movenum / (0.6f * num_intersections));
         auto blended_resign_threshold =
             blend_ratio * resign_threshold
@@ -463,6 +514,7 @@ bool UCTSearch::should_resign(const passflag_t passflag, const float besteval) {
     }
 
     if (!m_rootstate.is_move_legal(color, FastBoard::RESIGN)) {
+        // besteval supera il blended threshold, non deve arrendersi
         return false;
     }
 
@@ -497,13 +549,16 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
     // do we want to fiddle with the best move because of the rule set?
     if (passflag & UCTSearch::NOPASS) {
         // were we going to pass?
+        // Se la mossa migliore è passare, allora cerco una mossa migliore alternativa
         if (bestmove == FastBoard::PASS) {
             UCTNode* nopass = m_root->get_nopass_child(m_rootstate);
 
             if (nopass != nullptr) {
                 myprintf("Preferring not to pass.\n");
+                // Mossa alternativa impostata come migliore
                 bestmove = nopass->get_move();
                 if (nopass->first_visit()) {
+                    // Mossa mai stata visitata, viene valutata 1
                     besteval = 1.0f;
                 } else {
                     besteval = nopass->get_raw_eval(color);
@@ -617,6 +672,7 @@ std::string UCTSearch::get_pv(FastState& state, const UCTNode& parent) {
 
     auto& best_child = parent.get_best_root_child(state.get_to_move());
     if (best_child.first_visit()) {
+        // Il miglior figlio non è mai stato visitato
         return std::string();
     }
     auto best_move = best_child.get_move();
@@ -645,6 +701,7 @@ bool UCTSearch::is_running() const {
     return m_run && UCTNodePointer::get_tree_size() < cfg_max_tree_size;
 }
 
+// Playouts rimanenti in base al tempo trascorso e il tempo rimanente
 int UCTSearch::est_playouts_left(const int elapsed_centis,
                                  const int time_for_move) const {
     auto playouts = m_playouts.load();
@@ -680,6 +737,7 @@ size_t UCTSearch::prune_noncontenders(const int color, const int elapsed_centis,
             Nfirst = std::max(Nfirst, visits);
         }
     }
+    // Numero minimo di visite per rendere il nodo un contendente 
     const auto min_required_visits =
         Nfirst - est_playouts_left(elapsed_centis, time_for_move);
     auto pruned_nodes = size_t{0};
@@ -691,6 +749,7 @@ size_t UCTSearch::prune_noncontenders(const int color, const int elapsed_centis,
             // bound.
             const auto high_winrate =
                 visits > 0 ? node->get_raw_eval(color) >= lcb_max : false;
+            // Il nodo viene eliminato se non rispetta queste due caratteristiche
             const auto prune_this_node = !(has_enough_visits || high_winrate);
 
             if (prune) {
@@ -802,6 +861,8 @@ int UCTSearch::think(const int color, const passflag_t passflag) {
         Time elapsed;
         int elapsed_centis = Time::timediff_centis(start, elapsed);
 
+        // Stampa le informazioni se è presente un intervallo di tempo di analisi 
+        // ed è trascorso abbastanza tempo dall'ultima analisi.
         if (cfg_analyze_tags.interval_centis()
             && elapsed_centis - last_output
                    > cfg_analyze_tags.interval_centis()) {
@@ -879,6 +940,7 @@ std::string UCTSearch::explain_last_think() const {
     return m_think_output;
 }
 
+// Valutazione mosse durante turno avversario
 void UCTSearch::ponder() {
     auto disable_reuse = cfg_analyze_tags.has_move_restrictions();
     if (disable_reuse) {

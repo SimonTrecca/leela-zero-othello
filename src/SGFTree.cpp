@@ -59,13 +59,13 @@ void SGFTree::init_state() {
     m_state.init_game(std::min(BOARD_SIZE, 19), KOMI);
 }
 
-// Fornisce lo stato corrente del gioco.
+// Provides the current state of the game
 const KoState* SGFTree::get_state() const {
     assert(m_initialized);
     return &m_state;
 }
 
-// Restituisce il puntatore al figlio corrispondente all'indice fornito (count).
+// Returns the pointer to the child corresponding to the provided index (count).
 const SGFTree* SGFTree::get_child(const size_t count) const {
     if (count < m_children.size()) {
         assert(m_initialized);
@@ -85,8 +85,8 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
     // sets up the game history.
     GameState result(get_state());
 
-    // Se è stato definito un controllo di tempo, esso deve essere applicato 
-    // anche allo stato di gioco rappresentato da result.
+    // If a time control is defined, it must be applied also 
+    // to the game state represented by result.
     if (m_timecontrol_ptr) {
         result.set_timecontrol(*m_timecontrol_ptr);
     }
@@ -94,14 +94,14 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
     for (unsigned int i = 0; i <= movenum && link != nullptr; i++) {
         // root position has no associated move
         if (i != 0) {
-            // Ottiene la mossa del nodo link
+            // Gets the move of the link node
             auto colored_move = link->get_colored_move();
-            // Controlla che il colore sia valido
+            // Checks if the color is valid
             if (colored_move.first != FastBoard::INVAL) {
-                // Vengono effettuati tre controlli sulla coordinata della mossa:
-                // 1) la mossa deve essere diversa da PASS.
-                // 2) viene controllata la coordinata, evitando che venga eseguita una mossa su una cella non libera.
-                // 3) viene controllato lo stato della partita, assicurando che non venga eseguita una mossa su una cella non libera.
+                // Three checks are performed on the coordinate:
+                // 1) the move must not be PASS.
+                // 2) the coordinate is checked, avoiding a move on a non-empty cell.
+                // 3) the game state is checked, ensuring that a move is not made on a occupied cell.
                 if (colored_move.second != FastBoard::PASS
                     && colored_move.second != FastBoard::EMPTY
                     && result.board.get_state(colored_move.second)
@@ -109,12 +109,12 @@ GameState SGFTree::follow_mainline_state(const unsigned int movenum) const {
                     // Fail loading
                     return result;
                 }
-                // Mossa valida, viene giocata sullo stato del gioco result.
+                // Valid move, move played on the game state (result).
                 result.play_move(colored_move.first, colored_move.second);
             }
         }
-        // Link viene passato sul primo figlio del nodo corrente.
-        // Si continua a seguire la linea principale dell'albero.
+        // Link is passed to the first child of the current node.
+        // The loop continues to follow the mainline of the tree.
         link = link->get_child(0);
     }
 
@@ -151,8 +151,8 @@ void SGFTree::populate_states() {
     auto has_handicap = false;
 
     // first check for go game setup in properties
-    // Verifica se il gioco è di tipo Go.
-    // Se è Go ma manca la dimensione della scacchiera (SZ), viene inserita la dimensione standard di 19x19
+    // Check if it is a Go game.
+    // If it's Go but the board size (SZ) is not defined, the standard size of 19x19 is inserted.
     it = m_properties.find("GM");
     if (it != end(m_properties)) {
         if (it->second != "1") {
@@ -168,16 +168,16 @@ void SGFTree::populate_states() {
     }
 
     // board size
-    // Si cerca la dimensione della scacchiera nel file SGF.
+    // Look for the board size in the SGF file.
     it = m_properties.find("SZ");
-    // Se viene trovata, viene convertita da stringa ad intero.
+    // If found, convert it from string to integer.
     if (it != end(m_properties)) {
         const auto size = it->second;
         std::istringstream strm(size);
         int bsize;
         strm >> bsize;
-        // Controlla se la dimensione trovata è uguale a quella definita da BOARD_SIZE
-        // Se è valida, viene inizializzato il gioco con essa + valore di KOMI di default
+        // Check if the found size is equal to BOARD_SIZE
+        // If valid, initialize the game with it + default KOMI value
         if (bsize == BOARD_SIZE) {
             // Assume default komi in config.h if not specified
             m_state.init_game(bsize, KOMI);
@@ -188,9 +188,9 @@ void SGFTree::populate_states() {
         }
     }
 
-    // Gestione Komi: punti dati al secondo giocatore per lo svantaggio (non aver iniziato per primo).
-    // Viene cercato il valore di Komi dentro il file, convertito in virgola mobile e utilizzato per
-    // inizializzare la partita insieme alla dimensione della scacchiera (se valida).
+    // Komi: points given to the second player for disadvantage (not starting first).
+    // Search for the Komi value in the file, convert it to floating point, and use it to
+    // initialize the game along with the board size (if valid).
     it = m_properties.find("KM");
     if (it != end(m_properties)) {
         const auto foo = it->second;
@@ -213,12 +213,12 @@ void SGFTree::populate_states() {
     }
 
     // time
-    // Vengono cercati tempo principale e altre proprietà relative al controllo del tempo.
-    // OT: tempo extra per mossa
-    // BL: tempo rimasto al giocatore nero
-    // WL: tempo rimasto al giocatore bianco
-    // OB: mosse rimaste al giocatore nero
-    // OW: mosse rimaste al giocatore bianco
+    // Look for main time and other time control related properties.
+    // OT: extra time per move
+    // BL: time left for black player
+    // WL: time left for white player
+    // OB: moves left for black player
+    // OW: moves left for white player
     it = m_properties.find("TM");
     if (it != end(m_properties)) {
         const auto maintime = it->second;
@@ -236,14 +236,14 @@ void SGFTree::populate_states() {
         it = m_properties.find("OW");
         const auto white_moves_left =
             (it != end(m_properties)) ? it->second : "";
-        // Viene creato un oggetto TimeControl con le varie informazioni
+        // Create a TimeControl object with the previous information
         m_timecontrol_ptr = TimeControl::make_from_text_sgf(
             maintime, byoyomi, black_time_left, white_time_left,
             black_moves_left, white_moves_left);
     }
 
     // handicap
-    // Se è presente l'handicap (maggiore di 0), esso viene impostato come handicap del gioco.
+    // A handicap is found (greater than 0), it is set as the game's handicap.
     it = m_properties.find("HA");
     if (it != end(m_properties)) {
         const auto size = it->second;
@@ -255,8 +255,8 @@ void SGFTree::populate_states() {
     }
 
     // result
-    // Se la stringa result contiene la parola "Time" il risultato non è disponibile (EMPTY).
-    // Se inizia con "W+" o "B+" si ha un vincitore, mentre se non contiene nessuna di queste è invalido.
+    // If the result string contains the word "Time", the result is not available (EMPTY).
+    // If it starts with "W+" or "B+", there's a winner, otherwise, it's invalid.
     it = m_properties.find("RE");
     if (it != end(m_properties)) {
         const auto result = it->second;
@@ -283,14 +283,14 @@ void SGFTree::populate_states() {
     }
 
     // handicap stones
-    // Assegna le pietre di handicap del giocatore nero. 
+    // Assign the handicap stones of the black player. 
     auto prop_pair_ab = m_properties.equal_range("AB");
     // Do we have a handicap specified but no handicap stones placed in
     // the same node? Then the SGF file is corrupt. Let's see if we can find
     // them in the next node, which is a common bug in some Go apps.
     // 
-    // (Se ci sono handicap, ma non è specificato il valore, 
-    // allora si controlla il primo nodo figlio per cercarle)
+    // (If there is a handicap, but the value is not specified,
+    // then the first child node is checked to find it)
     if (has_handicap && prop_pair_ab.first == prop_pair_ab.second) {
         if (!m_children.empty()) {
             auto& successor = m_children[0];
@@ -298,14 +298,14 @@ void SGFTree::populate_states() {
         }
     }
     // Loop through the stone list and apply
-    // Per ogni pietra di handicap viene estratta la posizione e viene piazzata.
+    // For each handicap stone, the position is extracted and placed.
     for (auto pit = prop_pair_ab.first; pit != prop_pair_ab.second; ++pit) {
         const auto move = pit->second;
         const auto vtx = string_to_vertex(move);
         apply_move(FastBoard::BLACK, vtx);
     }
 
-    // Assegna le pietre di handicap del giocatore bianco.
+    // Assign the handicap stones of the white player.
     const auto& prop_pair_aw = m_properties.equal_range("AW");
     for (auto pit = prop_pair_aw.first; pit != prop_pair_aw.second; ++pit) {
         const auto move = pit->second;
@@ -313,7 +313,7 @@ void SGFTree::populate_states() {
         apply_move(FastBoard::WHITE, vtx);
     }
 
-    // Controlla il colore del giocatore che deve fare la prossima mossa
+    // Check the player color of the next move
     it = m_properties.find("PL");
     if (it != end(m_properties)) {
         const auto who = it->second;
@@ -326,8 +326,8 @@ void SGFTree::populate_states() {
     }
 
     // now for all children play out the moves
-    // Dopo aver copiato lo stato della partita al figlio, applica la sua mossa associata
-    // e procede ricorsivamente esplorando tutto il sotto-albero attraverso la funzione populate_states().
+    // After copying the game state to the child, apply its associated move
+    // and recursively proceed to explore the entire subtree through the populate_states() function.
     for (auto& child_state : m_children) {
         // propagate state
         child_state.copy_state(*this);
@@ -343,21 +343,21 @@ void SGFTree::populate_states() {
     }
 }
 
-// Copia stato di inizializzazione, stato di gioco e puntatore al controllo del tempo.
+// Copy initialization state, game state, and time control pointer.
 void SGFTree::copy_state(const SGFTree& tree) {
     m_initialized = tree.m_initialized;
     m_state = tree.m_state;
     m_timecontrol_ptr = tree.m_timecontrol_ptr;
 }
 
-// Verifica la validità della mossa per poi applicarla.
+// Check the validity of the move.
 void SGFTree::apply_move(const int color, const int move) {
-    // Controlla che non sia un passaggio o un abbandono.
+    // Check if it's a PASS or a RESIGN.
     if (move != FastBoard::PASS && move != FastBoard::RESIGN) {
-        // Salva lo stato della partita attuale.
+        // Save the current state of the game.
         auto vtx_state = m_state.board.get_state(move);
-        // Controlla se il punto della scacchiera è occupato dal colore opposto a quello che sta giocando
-        // oppure se è in un punto non valido.
+        // Check if the board point is occupied by the opposite color to the one playing
+        // or if it's in an invalid point.
         if (vtx_state == !color || vtx_state == FastBoard::INVAL) {
             throw std::runtime_error("Illegal move");
         }
@@ -380,7 +380,7 @@ void SGFTree::add_property(std::string property, std::string value) {
     m_properties.emplace(property, value);
 }
 
-// Crea un nodo figlio alla fine del vettore m_children.
+// Create a child node at the end of the vector (m_children).
 SGFTree* SGFTree::add_child() {
     // first allocation is better small
     if (m_children.size() == 0) {
@@ -390,6 +390,7 @@ SGFTree* SGFTree::add_child() {
     return &(m_children.back());
 }
 
+// Convert a string to a vertex (intersection) of the game board.
 int SGFTree::string_to_vertex(const std::string& movestring) const {
     if (movestring.size() == 0) {
         return FastBoard::PASS;
@@ -412,7 +413,7 @@ int SGFTree::string_to_vertex(const std::string& movestring) const {
     int cc1;
     int cc2;
 
-    // Conversione caratteri in coordinate (caratteri minuscoli = righe, maiuscoli = colonne)
+    // Convert characters to coordinates (lowercase = rows, uppercase = columns)
     if (c1 >= 'A' && c1 <= 'Z') {
         cc1 = 26 + c1 - 'A';
     }
@@ -436,6 +437,7 @@ int SGFTree::string_to_vertex(const std::string& movestring) const {
     return vtx;
 }
 
+// Return the move of the specified player
 int SGFTree::get_move(const int tomove) const {
     std::string colorstring;
 
@@ -455,6 +457,7 @@ int SGFTree::get_move(const int tomove) const {
     return SGFTree::EOT;
 }
 
+// Return the first pair found in the tree (color - move).
 std::pair<int, int> SGFTree::get_colored_move() const {
     for (const auto& prop : m_properties) {
         if (prop.first == "B") {
@@ -473,6 +476,7 @@ FastBoard::vertex_t SGFTree::get_winner() const {
     return m_winner;
 }
 
+// Returns a vector containing the moves of the mainline of the game
 std::vector<int> SGFTree::get_mainline() const {
     std::vector<int> moves;
 
@@ -480,6 +484,7 @@ std::vector<int> SGFTree::get_mainline() const {
     auto tomove = link->m_state.get_to_move();
     link = link->get_child(0);
 
+    // Traverse all children and save their moves until the end.
     while (link != nullptr && link->is_initialized()) {
         auto move = link->get_move(tomove);
         if (move != SGFTree::EOT) {
@@ -492,6 +497,7 @@ std::vector<int> SGFTree::get_mainline() const {
     return moves;
 }
 
+// Converts the current game state to a string
 std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     auto state = std::make_unique<GameState>();
 
@@ -501,6 +507,7 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     std::string header;
     std::string moves;
 
+    // Initialization of variables (komi, board size, and date)
     auto komi = state->get_komi();
     auto size = state->board.get_boardsize();
     time_t now;
@@ -508,14 +515,17 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     char timestr[sizeof "2017-10-16"];
     strftime(timestr, sizeof timestr, "%F", localtime(&now));
 
+    // Create SGF header containing necessary information
     header.append("(;GM[1]FF[4]RU[Chinese]");
     header.append("DT[" + std::string(timestr) + "]");
     header.append("SZ[" + std::to_string(size) + "]");
     header.append("KM[" + str(boost::format("%.1f") % komi) + "]");
     header.append(state->get_timecontrol().to_text_sgf());
 
+    // Program name
     auto leela_name = std::string{ PROGRAM_NAME };
     leela_name.append(" " + std::string(PROGRAM_VERSION));
+    // File with weights (add the first 8 characters of the weights file name to leela's name)
     if (!cfg_weightsfile.empty()) {
         auto pos = cfg_weightsfile.find_last_of("\\/");
         if (std::string::npos == pos) {
@@ -527,6 +537,7 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
         leela_name.append(" " + cfg_weightsfile.substr(pos, 8));
     }
 
+    // Leela's and human player's names
     if (compcolor == FastBoard::WHITE) {
         header.append("PW[" + leela_name + "]");
         header.append("PB[Human]");
@@ -542,6 +553,8 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     auto handicap = 0;
     std::string handicapstr;
 
+    // Find and create any handicap stones on the board.
+    // If found, save their position.
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             int vertex = state->board.get_vertex(i, j);
@@ -554,7 +567,8 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
             }
         }
     }
-
+    
+    // If present, add the handicap to the SGF header
     if (handicap > 0) {
         header.append("HA[" + std::to_string(handicap) + "]");
         moves.append("AB" + handicapstr);
@@ -564,6 +578,8 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
 
     int counter = 0;
 
+    // Read and save all moves.
+    // Check the player and the move made.
     while (state->forward_move()) {
         int move = state->get_last_move();
         assert(move != FastBoard::RESIGN);
@@ -574,11 +590,13 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
         else {
             moves.append(";B[" + movestr + "]");
         }
+        // Every 10 moves, move to the next line 
         if (++counter % 10 == 0) {
             moves.append("\n");
         }
     }
 
+    // If no player resigned, calculate the game score.
     if (!state->has_resigned()) {
         float score = state->final_score();
 
@@ -592,6 +610,7 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
             header.append("RE[0]");
         }
     }
+    // Player who resigned (if any)
     else {
         if (state->who_resigned() == FastBoard::WHITE) {
             header.append("RE[B+Resign]");

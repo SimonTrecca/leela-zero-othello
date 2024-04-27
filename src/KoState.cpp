@@ -39,15 +39,18 @@
 #include "FastState.h"
 #include "FullBoard.h"
 
+
+//initializes the board (calling the init_game of FastState class)
 void KoState::init_game(const int size, const float komi) {
     assert(size <= BOARD_SIZE);
 
     FastState::init_game(size, komi);
 
-    m_ko_hash_history.clear();
-    m_ko_hash_history.emplace_back(board.get_ko_hash());
+    m_ko_hash_history.clear(); //this is a vectory with all the hashes of ko states
+    m_ko_hash_history.emplace_back(board.get_ko_hash()); //add the current ko state 
 }
 
+//this checks if the current ko hash of the board is the same as last turn
 bool KoState::superko() const {
     auto first = crbegin(m_ko_hash_history);
     auto last = crend(m_ko_hash_history);
@@ -57,6 +60,7 @@ bool KoState::superko() const {
     return (res != last);
 }
 
+//resets the game and clears the ko hash history
 void KoState::reset_game() {
     FastState::reset_game();
 
@@ -64,10 +68,12 @@ void KoState::reset_game() {
     m_ko_hash_history.push_back(board.get_ko_hash());
 }
 
+//plays the move for turn player
 void KoState::play_move(const int vertex) {
     play_move(board.get_to_move(), vertex);
 }
 
+//plays a move for whatever color
 void KoState::play_move(const int color, const int vertex) {
     if (vertex != FastBoard::RESIGN) {
         FastState::play_move(color, vertex);

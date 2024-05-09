@@ -39,15 +39,13 @@
 
 class FastState {
 public:
-    void init_game(int size, float komi);
+    void init_game(int size);
     void reset_game();
     void reset_board();
 
     void play_move(int vertex);
+    void play_move(int color, int vertex);
     bool is_move_legal(int color, int vertex) const;
-
-    void set_komi(float komi);
-    float get_komi() const;
     void set_handicap(int hcap);
     int get_handicap() const;
     int get_passes() const;
@@ -56,7 +54,7 @@ public:
     void set_passes(int val);
     void increment_passes();
 
-    float final_score() const;
+    std::pair<int, int> final_score() const;
     std::uint64_t get_symmetry_hash(int symmetry) const;
 
     size_t get_movenum() const;
@@ -66,15 +64,11 @@ public:
 
     FullBoard board;
 
-    float m_komi;
     int m_handicap;
     int m_passes;
-    int m_komove;
     size_t m_movenum;
     int m_lastmove;
-
-protected:
-    void play_move(int color, int vertex);
+    
 };
 
 #endif

@@ -36,20 +36,19 @@
 
 #include "FastState.h"
 #include "FullBoard.h"
-#include "KoState.h"
 #include "TimeControl.h"
 
 class Network;
 
-class GameState : public KoState {
+class GameState : public FastState {
 public:
     explicit GameState() = default;
-    explicit GameState(const KoState* rhs) {
+    explicit GameState(const FastState* rhs) {
         // Copy in fields from base class.
-        *(static_cast<KoState*>(this)) = *rhs;
+        *(static_cast<FastState*>(this)) = *rhs;
         anchor_game_history();
     }
-    void init_game(int size, float komi);
+    void init_game(int size);
     void reset_game();
     bool set_fixed_handicap(int stones);
     int set_fixed_handicap_2(int stones);
@@ -60,7 +59,7 @@ public:
     bool undo_move();
     bool forward_move();
     const FullBoard& get_past_board(int moves_ago) const;
-    const std::vector<std::shared_ptr<const KoState>>& get_game_history() const;
+    const std::vector<std::shared_ptr<const FastState>>& get_game_history() const;
 
     void play_move(int color, int vertex);
     void play_move(int vertex);
@@ -81,7 +80,7 @@ public:
 private:
     bool valid_handicap(int stones);
 
-    std::vector<std::shared_ptr<const KoState>> m_game_history;
+    std::vector<std::shared_ptr<const FastState>> m_game_history;
     TimeControl m_timecontrol;
     int m_resigned{FastBoard::EMPTY};
 };

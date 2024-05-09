@@ -135,12 +135,6 @@ bool UCTSearch::advance_to_new_rootstate() {
         return false;
     }
 
-    // Controlla se il valore del komi è cambiato tra il 
-    // precedente rootstate e quello attuale
-    if (m_rootstate.get_komi() != m_last_rootstate->get_komi()) {
-        return false;
-    }
-
     auto depth =
         int(m_rootstate.get_movenum() - m_last_rootstate->get_movenum());
 
@@ -273,25 +267,18 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
     } BOOST_SCOPE_EXIT_END
 
     if (node->expandable()) {
-        // Se il nodo è espandibile ma sono stati fatti più di 2 passaggi
-        // allora si interrompe e viene restituito il risultato fino a quel punto.
-        if (currstate.get_passes() >= 2) {
-            auto score = currstate.final_score();
-            result = SearchResult::from_score(score);
-        } else {
-            float eval;
-            const auto had_children = node->has_children();
+        float eval;
+        const auto had_children = node->has_children();
 
-            // Careful: create_children() can throw a NetworkHaltException when
-            // another thread requests draining the search.
-            const auto success = node->create_children(
-                m_network, m_nodes, currstate, eval, get_min_psa_ratio());
-            // Il nodo non AVEVA figli e la creazione di un nuovo figlio ha avuto successo
-            // La simulazione termina e viene restituito il risultato.
-            if (!had_children && success) {
-                result = SearchResult::from_eval(eval);
-                new_node = true;
-            }
+        // Careful: create_children() can throw a NetworkHaltException when
+        // another thread requests draining the search.
+        const auto success = node->create_children(
+            m_network, m_nodes, currstate, eval, get_min_psa_ratio());
+        // Il nodo non AVEVA figli e la creazione di un nuovo figlio ha avuto successo
+        // La simulazione termina e viene restituito il risultato.
+        if (!had_children && success) {
+            result = SearchResult::from_eval(eval);
+            new_node = true;
         }
     }
 
@@ -303,7 +290,7 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
 
         // La mossa viene eseguita
         currstate.play_move(move);
-        if (move != FastBoard::PASS && currstate.superko()) {
+        if (move != FastBoard::PASS) {
             next->invalidate();
         } else {
             // Ricorsione della simulazione
@@ -568,8 +555,9 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
             }
         }
     } else if (!cfg_dumbpass) {
+        auto value_score = m_rootstate.final_score(); 
         const auto relative_score =
-            (color == FastBoard::BLACK ? 1 : -1) * m_rootstate.final_score();
+            (color == FastBoard::BLACK ? 1 : -1) * (value_score.first-value_score.second);
         if (bestmove == FastBoard::PASS) {
             // Either by forcing or coincidence passing is
             // on top...check whether passing loses instantly

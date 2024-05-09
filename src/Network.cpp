@@ -98,7 +98,7 @@ float Network::benchmark_time(const int centiseconds) {
     std::atomic<int> runcount{0};
 
     GameState state;
-    state.init_game(BOARD_SIZE, KOMI);
+    state.init_game(BOARD_SIZE);
 
     // As a sanity run, try one run with self check.
     // Isn't enough to guarantee correctness but better than nothing,

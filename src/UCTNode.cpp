@@ -119,16 +119,6 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
         allow_pass = true;
     }
 
-    // If we're clever, only try passing if we're winning on the
-    // net score and on the board count.
-    if (!allow_pass && stm_eval > 0.8f) {
-        const auto relative_score =
-            (to_move == FastBoard::BLACK ? 1 : -1) * state.final_score();
-        if (relative_score >= 0) {
-            allow_pass = true;
-        }
-    }
-
     if (allow_pass) {
         nodelist.emplace_back(raw_netlist.policy_pass, FastBoard::PASS);
         legal_sum += raw_netlist.policy_pass;

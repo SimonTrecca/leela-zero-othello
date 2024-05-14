@@ -65,9 +65,14 @@ void UCTNode::kill_passes(const GameState& state) {
 
     for (auto& child : m_children) {
         auto move = child->get_move();
+
+        if (move == FastBoard::PASS) {
+            pass_child = &child;
+        }
         if (child->valid()) {
             valid_count++;
         }
+
     }
 
     if (valid_count > 1 && pass_child

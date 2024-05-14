@@ -59,6 +59,31 @@ bool UCTNode::first_visit() const {
     return m_visits == 0;
 }
 
+void UCTNode::kill_passes(const GameState& state) {
+    UCTNodePointer* pass_child = nullptr;
+    size_t valid_count = 0;
+
+    for (auto& child : m_children) {
+        auto move = child->get_move();
+        if (child->valid()) {
+            valid_count++;
+        }
+    }
+
+    if (valid_count > 1 && pass_child
+        && !state.is_move_legal(state.get_to_move(), FastBoard::PASS)) {
+        // Remove the PASS node according to "avoid" -- but only if there are
+        // other valid nodes left.
+        (*pass_child)->invalidate();
+    }
+
+    // Now do the actual deletion.
+    m_children.erase(
+        std::remove_if(begin(m_children), end(m_children),
+            [](const auto& child) { return !child->valid(); }),
+        end(m_children));
+}
+
 bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
                               const GameState& state, float& eval,
                               const float min_psa_ratio) {

@@ -86,7 +86,10 @@ void FastState::play_move(const int vertex) {
 //this plays the move
 void FastState::play_move(const int color, const int vertex) {
     
-    board.update_board(color, vertex);
+    if (vertex != FastBoard::PASS) {
+        board.update_board(color, vertex);
+    }
+    
     m_lastmove = vertex;
     m_movenum++;
     board.m_tomove = !color;

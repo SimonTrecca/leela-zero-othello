@@ -180,6 +180,9 @@ void UCTNode::prepare_root_node(Network& network, const int color,
     // There are a lot of special cases where code assumes
     // all children of the root are inflated, so do that.
     inflate_all_children();
+
+    kill_passes(root_state);
+
     if (cfg_noise) {
         // Adjust the Dirichlet noise's alpha constant to the board size
         auto alpha = 0.03f * 361.0f / NUM_INTERSECTIONS;

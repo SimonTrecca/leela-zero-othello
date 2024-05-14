@@ -290,12 +290,8 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
 
         // La mossa viene eseguita
         currstate.play_move(move);
-        if (move != FastBoard::PASS) {
-            next->invalidate();
-        } else {
-            // Ricorsione della simulazione
-            result = play_simulation(currstate, next);
-        }
+
+        result = play_simulation(currstate, next);
     }
 
     // New node was updated in create_children.

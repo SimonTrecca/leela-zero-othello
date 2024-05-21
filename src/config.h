@@ -45,7 +45,7 @@
  * BOARD_SIZE: Define size of the board to compile Leela with, must be an odd
    number due to winograd tiles
  */
-static constexpr auto BOARD_SIZE = 19;
+static constexpr auto BOARD_SIZE = 8;
 
 static constexpr auto NUM_INTERSECTIONS = BOARD_SIZE * BOARD_SIZE;
 static constexpr auto POTENTIAL_MOVES = NUM_INTERSECTIONS + 1; // including pass

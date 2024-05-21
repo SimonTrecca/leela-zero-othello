@@ -144,11 +144,11 @@ void FastBoard::reset_board(const int size) {
         for (int j = 0; j < size; j++) {
             int vertex = get_vertex(i, j);
             
-            if (i == size / 2 && j == size / 2 || i == size / 2 + 1 && j == size / 2 + 1) { //pedine bianche iniziali
+            if (i == size / 2-1 && j == size / 2-1 || i == size / 2  && j == size / 2 ) { //pedine bianche iniziali
                 m_state[vertex] = BLACK;
                 center_piece_position[count++] = vertex;
             }
-            else if (i == size / 2 + 1 && j == size / 2 || i == size / 2 && j == size / 2 + 1) { //pedine nere iniziali
+            else if (i == size / 2 && j == size / 2 -1 || i == size / 2 -1 && j == size / 2) { //pedine nere iniziali
                 m_state[vertex] = WHITE;
                 center_piece_position[count++] = vertex;
             }

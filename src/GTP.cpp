@@ -616,8 +616,12 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         }
         // start thinking
         {
+            if (game.get_passes() >= 2) {
+                return;
+            }
             game.set_to_move(who);
             // Outputs winrate and pvs for lz-genmove_analyze
+            
             int move = search->think(who); //gets the move from the search tree
             game.play_move(move);
 
@@ -659,7 +663,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
             gtp_printf_raw("=\n");
         }
         // Now start pondering.
-        if (!game.has_resigned()) {
+        if (!game.has_resigned() && game.get_passes() < 2) {
             cfg_analyze_tags = tags;
             // Outputs winrate and pvs through gtp
             game.set_to_move(tags.who());
@@ -769,7 +773,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
             if (cfg_allow_pondering) {
                 // KGS sends this after our move
                 // now start pondering
-                if (!game.has_resigned()) {
+                if (!game.has_resigned() && game.get_passes() < 2) {
                     search->ponder();
                 }
             }
@@ -779,14 +783,19 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         return;
     } else if (command.find("auto") == 0) { //function lets program play on its own
         do {
-            int move = search->think(game.get_to_move(), UCTSearch::NORMAL);
-            game.play_move(move);
-            game.display_state();
+            if (game.get_passes() < 2) {
+                int move = search->think(game.get_to_move(), UCTSearch::NORMAL);
+                game.play_move(move);
+                game.display_state();
+            } 
 
         } while (game.get_passes() < 2 && !game.has_resigned());
 
         return;
     } else if (command.find("go") == 0 && command.size() < 6) { //plays one move on its own
+        if (game.get_passes() >= 2) {
+            return;
+        }
         int move = search->think(game.get_to_move());
         game.play_move(move);
 

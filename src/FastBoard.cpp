@@ -314,11 +314,14 @@ std::string FastBoard::move_to_text(const int move) const {
         result << static_cast<char>(column < 8 ? 'A' + column
                                                : 'A' + column + 1);
         result << (row + 1);
-    } else if (move == FastBoard::PASS) {
+    } 
+    else if (move == FastBoard::PASS) {
         result << "pass";
-    } else if (move == FastBoard::RESIGN) {
+    } 
+    else if (move == FastBoard::RESIGN) {
         result << "resign";
-    } else {
+    }
+    else {
         result << "error";
     }
 

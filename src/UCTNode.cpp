@@ -62,19 +62,17 @@ bool UCTNode::first_visit() const {
 void UCTNode::kill_passes(const GameState& state) {
     UCTNodePointer* pass_child = nullptr;
     size_t valid_count = 0;
-
     for (auto& child : m_children) {
         auto move = child->get_move();
-
         if (move == FastBoard::PASS) {
             pass_child = &child;
+
         }
         if (child->valid()) {
             valid_count++;
         }
 
     }
-
     if (valid_count > 1 && pass_child
         && !state.is_move_legal(state.get_to_move(), FastBoard::PASS)) {
         // Remove the PASS node according to "avoid" -- but only if there are
@@ -93,7 +91,7 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
                               const GameState& state, float& eval,
                               const float min_psa_ratio) {
     // no successors in final state
-    if (state.get_passes() >= 2) {
+    if (state.get_passes() > 2) {
         return false;
     }
 
@@ -107,7 +105,6 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
         expand_done();
         return false;
     }
-
     NNCache::Netresult raw_netlist;
     try {
         raw_netlist =
@@ -175,6 +172,8 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
     expand_done();
     return true;
 }
+
+
 
 void UCTNode::link_nodelist(std::atomic<int>& nodecount,
                             std::vector<Network::PolicyVertexPair>& nodelist,
@@ -325,7 +324,6 @@ void UCTNode::accumulate_eval(const float eval) {
 
 UCTNode* UCTNode::uct_select_child(const int color, const bool is_root) {
     wait_expanded();
-
     // Count parentvisits manually to avoid issues with transpositions.
     auto total_visited_policy = 0.0f;
     auto parentvisits = size_t{0};
@@ -346,10 +344,8 @@ UCTNode* UCTNode::uct_select_child(const int color, const bool is_root) {
         * std::sqrt(total_visited_policy);
     // Estimated eval for unknown nodes = parent (not NN) eval - reduction
     const auto fpu_eval = get_raw_eval(color) - fpu_reduction;
-
     auto best = static_cast<UCTNodePointer*>(nullptr);
     auto best_value = std::numeric_limits<double>::lowest();
-
     for (auto& child : m_children) {
         if (!child.active()) {
             continue;
@@ -380,6 +376,10 @@ UCTNode* UCTNode::uct_select_child(const int color, const bool is_root) {
     best->inflate();
     return best->get();
 }
+
+
+
+
 
 class NodeComp
     : public std::binary_function<UCTNodePointer&, UCTNodePointer&, bool> {

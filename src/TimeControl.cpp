@@ -227,7 +227,33 @@ void TimeControl::display_times() {
     myprintf("\n");
 }
 
-int TimeControl::max_time_for_move(const int boardsize, const int color,
+int TimeControl::max_time_for_move(const int boardsize, const int color, const size_t movenum) const {
+    // Othello-specific time settings for faster play
+    const int total_time = 3 * 60 * 100;  // Total time per player in centiseconds (e.g., 3 minutes)
+    const int move_increment = 3 * 100;  // Increment per move in centiseconds (e.g., 3 seconds)
+    const int max_moves = 49;  // Maximum number of moves on a 7x7 board
+
+    // Calculate the remaining time
+    int time_remaining = m_remaining_time[color];
+    int moves_remaining = static_cast<int>(max_moves - movenum);
+
+    // Ensure moves_remaining is at least 1 to avoid division by zero
+    moves_remaining = std::max(moves_remaining, 1);
+
+    // Calculate the base time for the current move
+    int base_time = std::max(time_remaining - cfg_lagbuffer_cs, 0) / moves_remaining;
+
+    // Add the per-move increment
+    int inc_time = std::max(move_increment - cfg_lagbuffer_cs, 0);
+
+    // Return the sum of base time and increment
+    return base_time + inc_time;
+}
+
+
+
+
+/*int TimeControl::max_time_for_move(const int boardsize, const int color,
                                    const size_t movenum) const {
     // default: no byo yomi (absolute)
     auto time_remaining = m_remaining_time[color];
@@ -235,10 +261,7 @@ int TimeControl::max_time_for_move(const int boardsize, const int color,
     auto extra_time_per_move = 0;
 
     if (m_byotime != 0) {
-        /*
-          no periods or stones set means
-          infinite time = 1 month
-        */
+
         if (m_byostones == 0 && m_byoperiods == 0) {
             return 31 * 24 * 60 * 60 * 100;
         }
@@ -254,9 +277,7 @@ int TimeControl::max_time_for_move(const int boardsize, const int color,
                 extra_time_per_move = m_byotime;
             }
         } else {
-            /*
-              byo yomi time but not in byo yomi yet
-            */
+
             if (m_byostones) {
                 int byo_extra = m_byotime / m_byostones;
                 time_remaining = m_remaining_time[color] + byo_extra;
@@ -279,7 +300,8 @@ int TimeControl::max_time_for_move(const int boardsize, const int color,
     auto inc_time = std::max(extra_time_per_move - cfg_lagbuffer_cs, 0);
 
     return base_time + inc_time;
-}
+    //return 10;
+}*/
 
 void TimeControl::adjust_time(const int color, const int time,
                               const int stones) {

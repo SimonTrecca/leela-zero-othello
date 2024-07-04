@@ -39,17 +39,16 @@
 #include "FastBoard.h"
 #include "FastState.h"
 #include "FullBoard.h"
-#include "KoState.h"
 #include "Network.h"
 #include "UCTSearch.h"
 
 //This class is an extension of class KoState
 //Initializes the game by initializing a kostate and other variables like time lcock and previous states
-void GameState::init_game(const int size, const float komi) {
-    KoState::init_game(size, komi);
+void GameState::init_game(const int size) {
+    FastState::init_game(size);
 
     m_game_history.clear(); //m_game_history is a vector or kostates
-    m_game_history.emplace_back(std::make_shared<KoState>(*this));
+    m_game_history.emplace_back(std::make_shared<FastState>(*this));
 
     m_timecontrol.reset_clocks(); //m_timecontrol is an instance of TimeControl, manages time
 
@@ -58,10 +57,10 @@ void GameState::init_game(const int size, const float komi) {
 
 //resets the game state
 void GameState::reset_game() {
-    KoState::reset_game();
+    FastState::reset_game();
 
     m_game_history.clear();
-    m_game_history.emplace_back(std::make_shared<KoState>(*this));
+    m_game_history.emplace_back(std::make_shared<FastState>(*this));
 
     m_timecontrol.reset_clocks();
 
@@ -72,7 +71,7 @@ void GameState::reset_game() {
 bool GameState::forward_move() {
     if (m_game_history.size() > m_movenum + 1) {
         m_movenum++;
-        *(static_cast<KoState*>(this)) = *m_game_history[m_movenum]; //updates the kostate part of the gamestate to the new move number state
+        *(static_cast<FastState*>(this)) = *m_game_history[m_movenum]; //updates the kostate part of the gamestate to the new move number state
         return true;
     } else {
         return false;
@@ -85,7 +84,7 @@ bool GameState::undo_move() {
         m_movenum--;
 
         // this is not so nice, but it should work
-        *(static_cast<KoState*>(this)) = *m_game_history[m_movenum];
+        *(static_cast<FastState*>(this)) = *m_game_history[m_movenum];
 
         // This also restores hashes as they're part of state
         return true;
@@ -96,7 +95,7 @@ bool GameState::undo_move() {
 
 //returns to initial game state
 void GameState::rewind() {
-    *(static_cast<KoState*>(this)) = *m_game_history[0];
+    *(static_cast<FastState*>(this)) = *m_game_history[0];
     m_movenum = 0;
 }
 
@@ -110,12 +109,12 @@ void GameState::play_move(const int color, const int vertex) {
     if (vertex == FastBoard::RESIGN) {
         m_resigned = color;
     } else {
-        KoState::play_move(color, vertex);
+        FastState::play_move(color, vertex);
     }
 
     // cut off any leftover moves from navigating
     m_game_history.resize(m_movenum);
-    m_game_history.emplace_back(std::make_shared<KoState>(*this));
+    m_game_history.emplace_back(std::make_shared<FastState>(*this));
 }
 
 //parses a text to play a move
@@ -132,8 +131,7 @@ bool GameState::play_textmove(std::string color, const std::string& vertex) {
 
     const auto move = board.text_to_move(vertex);
     if (move == FastBoard::NO_VERTEX
-        || (move != FastBoard::PASS && move != FastBoard::RESIGN
-            && board.get_state(move) != FastBoard::EMPTY)) {
+        || !is_move_legal(who, move)) {
         return false;
     }
 
@@ -188,7 +186,7 @@ void GameState::anchor_game_history() {
     // handicap moves don't count in game history
     m_movenum = 0;
     m_game_history.clear();
-    m_game_history.emplace_back(std::make_shared<KoState>(*this));
+    m_game_history.emplace_back(std::make_shared<FastState>(*this));
 }
 
 //this sets up a handicap
@@ -327,7 +325,7 @@ const FullBoard& GameState::get_past_board(const int moves_ago) const {
     return m_game_history[m_movenum - moves_ago]->board;
 }
 
-const std::vector<std::shared_ptr<const KoState>>&
+const std::vector<std::shared_ptr<const FastState>>&
 GameState::get_game_history() const {
     return m_game_history;
 }

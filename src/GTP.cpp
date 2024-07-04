@@ -394,13 +394,11 @@ const std::string GTP::s_commands[] = {
     "list_commands",
     "boardsize",
     "clear_board",
-    "komi",
     "play",
     "genmove",
     "showboard",
     "undo",
     "final_score",
-    "final_status_list",
     "time_settings",
     "time_left",
     "fixed_handicap",
@@ -436,36 +434,6 @@ const std::string GTP::s_options[] = {
     ""
 };
 
-//it gets a list of all stones on board
-std::string GTP::get_life_list(const GameState& game, const bool live) {
-    std::vector<std::string> stringlist;
-    std::string result;
-    const auto& board = game.board;
-
-    if (live) {
-        for (int i = 0; i < board.get_boardsize(); i++) {
-            for (int j = 0; j < board.get_boardsize(); j++) {
-                int vertex = board.get_vertex(i, j);
-
-                if (board.get_state(vertex) != FastBoard::EMPTY) {
-                    stringlist.push_back(board.get_string(vertex));
-                }
-            }
-        }
-    }
-
-    // remove multiple mentions of the same string
-    // unique reorders and returns new iterator, erase actually deletes
-    std::sort(begin(stringlist), end(stringlist));
-    stringlist.erase(std::unique(begin(stringlist), end(stringlist)),
-                     end(stringlist));
-
-    for (size_t i = 0; i < stringlist.size(); i++) {
-        result += (i == 0 ? "" : "\n") + stringlist[i];
-    }
-
-    return result;
-}
 
 
 void GTP::execute(GameState& game, const std::string& xinput) {
@@ -571,9 +539,8 @@ void GTP::execute(GameState& game, const std::string& xinput) {
             if (tmp != BOARD_SIZE) {
                 gtp_fail_printf(id, "unacceptable size");
             } else {
-                float old_komi = game.get_komi();
                 Training::clear_training();
-                game.init_game(tmp, old_komi);
+                game.init_game(tmp);
                 gtp_printf(id, "");
             }
         } else {
@@ -587,25 +554,6 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         search = std::make_unique<UCTSearch>(game, *s_network);
         assert(UCTNodePointer::get_tree_size() == 0);
         gtp_printf(id, "");
-        return;
-    } else if (command.find("komi") == 0) { //sets komi size
-        std::istringstream cmdstream(command);
-        std::string tmp;
-        float komi = KOMI;
-        float old_komi = game.get_komi();
-
-        cmdstream >> tmp; // eat komi
-        cmdstream >> komi;
-
-        if (!cmdstream.fail()) {
-            if (komi != old_komi) {
-                game.set_komi(komi);
-            }
-            gtp_printf(id, "");
-        } else {
-            gtp_fail_printf(id, "syntax not understood");
-        }
-
         return;
     } else if (command.find("play") == 0) { //plays the move specifying color and vertex
         std::istringstream cmdstream(command);
@@ -668,8 +616,12 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         }
         // start thinking
         {
+            if (game.get_passes() >= 2) {
+                return;
+            }
             game.set_to_move(who);
             // Outputs winrate and pvs for lz-genmove_analyze
+            
             int move = search->think(who); //gets the move from the search tree
             game.play_move(move);
 
@@ -711,7 +663,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
             gtp_printf_raw("=\n");
         }
         // Now start pondering.
-        if (!game.has_resigned()) {
+        if (!game.has_resigned() && game.get_passes() < 2) {
             cfg_analyze_tags = tags;
             // Outputs winrate and pvs through gtp
             game.set_to_move(tags.who());
@@ -769,28 +721,17 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         game.display_state();
         return;
     } else if (command.find("final_score") == 0) {
-        float ftmp = game.final_score();
+        std::pair<int,int> ftmp = game.final_score();
         /* white wins */
-        if (ftmp < -0.1) {
-            gtp_printf(id, "W+%3.1f", float(fabs(ftmp)));
-        } else if (ftmp > 0.1) {
-            gtp_printf(id, "B+%3.1f", ftmp);
+        if (ftmp.first < ftmp.second) {
+            gtp_printf(id, "W+%d", ftmp.second);
+        } else if (ftmp.first > ftmp.second) {
+            gtp_printf(id, "B+%d", ftmp.first);
         } else {
             gtp_printf(id, "0");
         }
         return;
-    } else if (command.find("final_status_list") == 0) {
-        if (command.find("alive") != std::string::npos) {
-            std::string livelist = get_life_list(game, true);
-            gtp_printf(id, livelist.c_str());
-        } else if (command.find("dead") != std::string::npos) {
-            std::string deadlist = get_life_list(game, false);
-            gtp_printf(id, deadlist.c_str());
-        } else {
-            gtp_printf(id, "");
-        }
-        return;
-    } else if (command.find("time_settings") == 0) { //sets up time
+    }  else if (command.find("time_settings") == 0) { //sets up time
         std::istringstream cmdstream(command);
         std::string tmp;
         int maintime, byotime, byostones;
@@ -832,7 +773,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
             if (cfg_allow_pondering) {
                 // KGS sends this after our move
                 // now start pondering
-                if (!game.has_resigned()) {
+                if (!game.has_resigned() && game.get_passes() < 2) {
                     search->ponder();
                 }
             }
@@ -842,14 +783,19 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         return;
     } else if (command.find("auto") == 0) { //function lets program play on its own
         do {
-            int move = search->think(game.get_to_move(), UCTSearch::NORMAL);
-            game.play_move(move);
-            game.display_state();
+            if (game.get_passes() < 2) {
+                int move = search->think(game.get_to_move(), UCTSearch::NORMAL);
+                game.play_move(move);
+                game.display_state();
+            } 
 
         } while (game.get_passes() < 2 && !game.has_resigned());
 
         return;
     } else if (command.find("go") == 0 && command.size() < 6) { //plays one move on its own
+        if (game.get_passes() >= 2) {
+            return;
+        }
         int move = search->think(game.get_to_move());
         game.play_move(move);
 

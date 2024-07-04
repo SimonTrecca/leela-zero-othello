@@ -135,12 +135,6 @@ bool UCTSearch::advance_to_new_rootstate() {
         return false;
     }
 
-    // Controlla se il valore del komi è cambiato tra il 
-    // precedente rootstate e quello attuale
-    if (m_rootstate.get_komi() != m_last_rootstate->get_komi()) {
-        return false;
-    }
-
     auto depth =
         int(m_rootstate.get_movenum() - m_last_rootstate->get_movenum());
 
@@ -213,7 +207,7 @@ void UCTSearch::update_root() {
     // Definition of m_playouts is playouts per search call.
     // So reset this count now.
     m_playouts = 0;
-
+    
 #ifndef NDEBUG
     // Viene registrato il numero di nodi nell'albero.
     auto start_nodes = m_root->count_nodes_and_clear_expand_state();
@@ -273,25 +267,18 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
     } BOOST_SCOPE_EXIT_END
 
     if (node->expandable()) {
-        // Se il nodo è espandibile ma sono stati fatti più di 2 passaggi
-        // allora si interrompe e viene restituito il risultato fino a quel punto.
-        if (currstate.get_passes() >= 2) {
-            auto score = currstate.final_score();
-            result = SearchResult::from_score(score);
-        } else {
-            float eval;
-            const auto had_children = node->has_children();
+        float eval;
+        const auto had_children = node->has_children();
 
-            // Careful: create_children() can throw a NetworkHaltException when
-            // another thread requests draining the search.
-            const auto success = node->create_children(
-                m_network, m_nodes, currstate, eval, get_min_psa_ratio());
-            // Il nodo non AVEVA figli e la creazione di un nuovo figlio ha avuto successo
-            // La simulazione termina e viene restituito il risultato.
-            if (!had_children && success) {
-                result = SearchResult::from_eval(eval);
-                new_node = true;
-            }
+        // Careful: create_children() can throw a NetworkHaltException when
+        // another thread requests draining the search.
+        const auto success = node->create_children(
+            m_network, m_nodes, currstate, eval, get_min_psa_ratio());
+        // Il nodo non AVEVA figli e la creazione di un nuovo figlio ha avuto successo
+        // La simulazione termina e viene restituito il risultato.
+        if (!had_children && success) {
+            result = SearchResult::from_eval(eval);
+            new_node = true;
         }
     }
 
@@ -303,12 +290,8 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
 
         // La mossa viene eseguita
         currstate.play_move(move);
-        if (move != FastBoard::PASS && currstate.superko()) {
-            next->invalidate();
-        } else {
-            // Ricorsione della simulazione
-            result = play_simulation(currstate, next);
-        }
+
+        result = play_simulation(currstate, next);
     }
 
     // New node was updated in create_children.
@@ -568,8 +551,9 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
             }
         }
     } else if (!cfg_dumbpass) {
+        auto value_score = m_rootstate.final_score(); 
         const auto relative_score =
-            (color == FastBoard::BLACK ? 1 : -1) * m_rootstate.final_score();
+            (color == FastBoard::BLACK ? 1 : -1) * (value_score.first-value_score.second);
         if (bestmove == FastBoard::PASS) {
             // Either by forcing or coincidence passing is
             // on top...check whether passing loses instantly
@@ -826,6 +810,7 @@ void UCTSearch::increment_playouts() {
 }
 
 int UCTSearch::think(const int color, const passflag_t passflag) {
+
     // Start counting time for us
     m_rootstate.start_clock(color);
 
@@ -844,14 +829,12 @@ int UCTSearch::think(const int color, const passflag_t passflag) {
     // create a sorted list of legal moves (make sure we
     // play something legal and decent even in time trouble)
     m_root->prepare_root_node(m_network, color, m_nodes, m_rootstate);
-
     m_run = true;
     int cpus = cfg_num_threads;
     ThreadGroup tg(thread_pool);
     for (int i = 0; i < cpus; i++) {
         tg.add_task(UCTWorker(m_rootstate, this, m_root.get()));
     }
-
     auto keeprunning = true;
     auto last_update = 0;
     auto last_output = 0;
@@ -880,12 +863,10 @@ int UCTSearch::think(const int color, const passflag_t passflag) {
         keeprunning &= !stop_thinking(elapsed_centis, time_for_move);
         keeprunning &= have_alternate_moves(elapsed_centis, time_for_move);
     } while (keeprunning);
-
     // Make sure to post at least once.
     if (cfg_analyze_tags.interval_centis() && last_output == 0) {
         output_analysis(m_rootstate, *m_root);
     }
-
     // Stop the search.
     m_run = false;
     m_network.drain_evals();
@@ -896,17 +877,16 @@ int UCTSearch::think(const int color, const passflag_t passflag) {
     for (const auto& node : m_root->get_children()) {
         node->set_active(true);
     }
-
     m_rootstate.stop_clock(color);
+    m_root->has_children();
+
     if (!m_root->has_children()) {
         return FastBoard::PASS;
     }
-
     // Display search info.
     myprintf("\n");
     dump_stats(m_rootstate, *m_root);
     Training::record(m_network, m_rootstate, *m_root);
-
     Time elapsed;
     int elapsed_centis = Time::timediff_centis(start, elapsed);
     myprintf("%d visits, %d nodes, %d playouts, %.0f n/s\n\n",
@@ -921,7 +901,6 @@ int UCTSearch::think(const int color, const passflag_t passflag) {
 #endif
 
     int bestmove = get_best_move(passflag);
-
     // Save the explanation.
     m_think_output =
         str(boost::format("move %d, %c => %s\n%s")

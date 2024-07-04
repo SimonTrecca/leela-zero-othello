@@ -51,12 +51,6 @@ const int FastBoard::PASS;
 const int FastBoard::RESIGN;
 
 
-//this is a bitmask where each bit is a flag that identifies eyes on the go board
-const std::array<int, 2> FastBoard::s_eyemask = {
-    4 * (1 << (NBR_SHIFT * BLACK)),
-    4 * (1 << (NBR_SHIFT * WHITE))
-};
-
 const std::array<FastBoard::vertex_t, 4> FastBoard::s_cinvert = {
     WHITE, BLACK, EMPTY, INVAL
 };
@@ -127,30 +121,43 @@ void FastBoard::reset_board(const int size) {
     m_sidevertices = size + 2; //adds two to account for borders
     m_numvertices = m_sidevertices * m_sidevertices;
     m_tomove = BLACK;
-    m_prisoners[BLACK] = 0;
-    m_prisoners[WHITE] = 0;
     m_empty_cnt = 0; //counts the empty vertexes
-
+    std::array<int, 4>  center_piece_position;
+    int count = 0;
     //these are the directions
     m_dirs[0] = -m_sidevertices;
-    m_dirs[1] = +1;
-    m_dirs[2] = +m_sidevertices;
-    m_dirs[3] = -1;
+    m_dirs[1] = -m_sidevertices + 1;
+    m_dirs[2] = +1;
+    m_dirs[3] = +m_sidevertices +1;
+    m_dirs[4] = +m_sidevertices;
+    m_dirs[5] = +m_sidevertices-1;
+    m_dirs[6] = -1;
+    m_dirs[7] = -m_sidevertices - 1;
     
     //sets up all the vertices as invalid
     for (int i = 0; i < m_numvertices; i++) {
         m_state[i] = INVAL;
         m_neighbours[i] = 0;
-        m_parent[i] = NUM_VERTICES;
     }
-
+    
     for (int i = 0; i < size; i++) {
         for (int j = 0; j < size; j++) {
             int vertex = get_vertex(i, j);
-
-            m_state[vertex] = EMPTY; //sets up the vertex state as empty
-            m_empty_idx[vertex] = m_empty_cnt; //since m_empty_cnt is used as the position in the m_empty vector, where all the empty vertexes are stored, you can use this to find the index of the vertex in m_empty
-            m_empty[m_empty_cnt++] = vertex; //this adds the vertex to the list of empty ones then increases the m_empty_cnt value
+            
+            if (i == size / 2-1 && j == size / 2-1 || i == size / 2  && j == size / 2 ) { //pedine bianche iniziali
+                m_state[vertex] = BLACK;
+                center_piece_position[count++] = vertex;
+            }
+            else if (i == size / 2 && j == size / 2 -1 || i == size / 2 -1 && j == size / 2) { //pedine nere iniziali
+                m_state[vertex] = WHITE;
+                center_piece_position[count++] = vertex;
+            }
+            else {
+                m_state[vertex] = EMPTY; //sets up the vertex state as empty
+                m_empty_idx[vertex] = m_empty_cnt; //since m_empty_cnt is used as the position in the m_empty vector, where all the empty vertexes are stored, you can use this to find the index of the vertex in m_empty
+                m_empty[m_empty_cnt++] = vertex; //this adds the vertex to the list of empty ones then increases the m_empty_cnt value
+            }
+            
 
             if (i == 0 || i == size - 1) { //this checks if it's on the top or bottom edge
                 m_neighbours[vertex] += (1 << (NBR_SHIFT * BLACK))
@@ -167,49 +174,19 @@ void FastBoard::reset_board(const int size) {
             } else {
                 m_neighbours[vertex] +=  2 << (NBR_SHIFT * EMPTY); //if it's not a border vertex, it puts 2 in the bitmax in the zone dedicated to "empty" 
             }
+
+            
+        }
+        
+        
+        
+        for (int i = 0; i < count; i++) {
+            auto piece = center_piece_position[i];
+            add_neighbour(piece, m_state[piece]);
         }
     }
-
-    m_parent[NUM_VERTICES] = NUM_VERTICES;
-    m_libs[NUM_VERTICES] = 16384; /* we will subtract from this */
-    m_next[NUM_VERTICES] = NUM_VERTICES;
-
+    
     assert(m_state[NO_VERTEX] == INVAL);
-}
-
-//This function checks if placing a stone at vertex 'i' by player of 'color' would result in a suicide move
-bool FastBoard::is_suicide(const int i, const int color) const {
-    // If there are liberties next to us, it is never suicide
-    if (count_pliberties(i)) {
-        return false;
-    }
-
-    // If we get here, we played in a "hole" surrounded by stones
-    for (auto k = 0; k < 4; k++) {
-        auto ai = i + m_dirs[k]; //m_dirs represents the directions, so m[0] is the vertex up, m[1] is to the right, m[2] is at the bottom, and m[3] is to the left
-
-        auto libs = m_libs[m_parent[ai]]; //it checks for the liberties of the group
-        if (get_state(ai) == color) { //if this adjacent is our same color
-            if (libs > 1) { //and it has more than 1 liberty 
-                // connecting to live group = not suicide
-                return false;
-            }
-        } else if (get_state(ai) == !color) { //if this adjacent is our opponent's color
-            if (libs <= 1) { //and it has less or 1 liberty
-                // killing neighbour = not suicide
-                return false;
-            }
-        }
-    }
-
-    // We played in a hole, friendlies had one liberty at most and
-    // we did not kill anything. So we killed ourselves.
-    return true;
-}
-
-//checks how many empty neighbours the vertex has
-int FastBoard::count_pliberties(const int i) const {
-    return count_neighbours(EMPTY, i);
 }
 
 // count neighbours of color c at vertex v
@@ -223,93 +200,48 @@ int FastBoard::count_neighbours(const int c, const int v) const {
 void FastBoard::add_neighbour(const int vtx, const int color) {
     assert(color == WHITE || color == BLACK || color == EMPTY);
 
-    std::array<int, 4> nbr_pars; 
-    int nbr_par_cnt = 0;
-
-    for (int k = 0; k < 4; k++) {
+    for (int k = 0; k < 8; k++) {
         int ai = vtx + m_dirs[k]; //iterates on its neighbours
 
         m_neighbours[ai] += (1 << (NBR_SHIFT * color))
                           - (1 << (NBR_SHIFT * EMPTY)); //removes an empty, adds one of the color of the pawn we added
-
-        bool found = false;
-        for (int i = 0; i < nbr_par_cnt; i++) {
-            if (nbr_pars[i] == m_parent[ai]) {
-                found = true;
-                break;
-            }
-        }
-        if (!found) {
-            m_libs[m_parent[ai]]--; //removes a liberty from the group
-            nbr_pars[nbr_par_cnt++] = m_parent[ai];
-        }
     }
 }
 
-//does the same thing as function above, but it removes instead of adding
-void FastBoard::remove_neighbour(const int vtx, const int color) {
+void FastBoard::flip_neighbour(const int vtx, const int color) { //instead of removing empty spaces when adding a new pawn, we want to flip to the new color
     assert(color == WHITE || color == BLACK || color == EMPTY);
-
-    std::array<int, 4> nbr_pars;
-    int nbr_par_cnt = 0;
-
-    for (int k = 0; k < 4; k++) {
-        int ai = vtx + m_dirs[k]; 
-
-        m_neighbours[ai] += (1 << (NBR_SHIFT * EMPTY))
-                          - (1 << (NBR_SHIFT * color));
-
-        bool found = false;
-        for (int i = 0; i < nbr_par_cnt; i++) {
-            if (nbr_pars[i] == m_parent[ai]) {
-                found = true;
-                break;
-            }
+    
+    for (int k = 0; k < 8; k++) {
+        int ai = vtx + m_dirs[k]; //iterates on its neighbours
+        if (color == BLACK) {
+            m_neighbours[ai] += (1 << (NBR_SHIFT * color))
+                - (1 << (NBR_SHIFT * WHITE)); //removes a white, adds a black
         }
-        if (!found) {
-            m_libs[m_parent[ai]]++; //adds a liberty to the group
-            nbr_pars[nbr_par_cnt++] = m_parent[ai];
+        if (color == WHITE) {
+            m_neighbours[ai] += (1 << (NBR_SHIFT * color))
+                - (1 << (NBR_SHIFT * BLACK)); //removes a black, adds a white
         }
     }
+    
 }
 
-//returns how many vertexes of the given color are reachable on the board
-int FastBoard::calc_reach_color(const int color) const {
-    auto reachable = 0; //counts the reachable vertices of a given color on the board
-    auto bd = std::vector<bool>(m_numvertices, false); //marks visited vertices, defaults at false
-    auto open = std::queue<int>(); //initializes a queue to add vertexes of the same color in
-    for (auto i = 0; i < m_boardsize; i++) {
-        for (auto j = 0; j < m_boardsize; j++) {
-            auto vertex = get_vertex(i, j);
-            if (m_state[vertex] == color) {
-                reachable++;
-                bd[vertex] = true; 
-                open.push(vertex);
+// Gives the scores for each player
+std::pair<int, int> FastBoard::area_score() const {
+    int black_count=0, white_count=0;
+    
+    for (int i = 0; i < m_boardsize; i++) {
+        for (int j = 0; j < m_boardsize; j++) {
+            int vertex = get_vertex(i, j);
+            if (m_state[vertex] == BLACK) {
+                ++black_count;
+            }
+            if (m_state[vertex] == WHITE) {
+                ++white_count;
             }
         }
     }
-    while (!open.empty()) { //for each vertex we found on the board with the color we're looking for
-        /* colored field, spread */
-        auto vertex = open.front();
-        open.pop();
-
-        for (auto k = 0; k < 4; k++) {
-            auto neighbor = vertex + m_dirs[k]; //it checks its neighbours
-            if (!bd[neighbor] && m_state[neighbor] == EMPTY) { //if a neighbour hasn't been explored yet and is empty
-                reachable++; //then it becomes reachable
-                bd[neighbor] = true;
-                open.push(neighbor);//and it's added to the queue 
-            }
-        }
-    }
-    return reachable;
-}
-
-// Needed for scoring passed out games not in MC playouts
-float FastBoard::area_score(const float komi) const {
-    auto white = calc_reach_color(WHITE);
-    auto black = calc_reach_color(BLACK);
-    return black - white - komi;
+    
+    return std::make_pair(black_count, white_count);
 }
 
 //This function displays the board, marking the last move played
@@ -362,85 +294,7 @@ void FastBoard::print_columns() {
     myprintf("\n");
 }
 
-//when two groups of stones merge, this function merges them into one parent and updates the parents of all the stones in both groups
-void FastBoard::merge_strings(const int ip, const int aip) {
-    assert(ip != NUM_VERTICES && aip != NUM_VERTICES);
 
-    /* merge stones */
-    m_stones[ip] += m_stones[aip];
-
-    /* loop over stones, update parents */
-    int newpos = aip;
-
-    do {
-        // check if this stone has a liberty
-        for (int k = 0; k < 4; k++) {
-            int ai = newpos + m_dirs[k];
-            // for each liberty, check if it is not shared
-            if (m_state[ai] == EMPTY) {
-                // find liberty neighbors
-                bool found = false;
-                for (int kk = 0; kk < 4; kk++) {
-                    int aai = ai + m_dirs[kk];
-                    // friendly string shouldn't be ip
-                    // ip can also be an aip that has been marked
-                    if (m_parent[aai] == ip) {
-                        found = true;
-                        break;
-                    }
-                }
-
-                if (!found) {
-                    m_libs[ip]++;
-                }
-            }
-        }
-
-        m_parent[newpos] = ip;
-        newpos = m_next[newpos];
-    } while (newpos != aip);
-
-    /* merge stings */
-    std::swap(m_next[aip], m_next[ip]);
-}
-
-//this checks if there is an eye pattern
-bool FastBoard::is_eye(const int color, const int i) const {
-    /* check for 4 neighbors of the same color */
-    int ownsurrounded = (m_neighbours[i] & s_eyemask[color]);
-
-    // if not, it can't be an eye
-    // this takes advantage of borders being colored
-    // both ways
-    if (!ownsurrounded) {
-        return false;
-    }
-
-    // 2 or more diagonals taken
-    // 1 for side groups
-    int colorcount[4];
-
-    colorcount[BLACK] = 0;
-    colorcount[WHITE] = 0;
-    colorcount[INVAL] = 0;
-
-    colorcount[m_state[i - 1 - m_sidevertices]]++;
-    colorcount[m_state[i + 1 - m_sidevertices]]++;
-    colorcount[m_state[i - 1 + m_sidevertices]]++;
-    colorcount[m_state[i + 1 + m_sidevertices]]++;
-
-    if (colorcount[INVAL] == 0) {
-        if (colorcount[!color] > 1) {
-            return false;
-        }
-    } else {
-        if (colorcount[!color]) {
-            return false;
-        }
-    }
-
-    return true;
-}
 //converts the move to text
 std::string FastBoard::move_to_text(const int move) const {
     std::ostringstream result;
@@ -460,11 +314,14 @@ std::string FastBoard::move_to_text(const int move) const {
         result << static_cast<char>(column < 8 ? 'A' + column
                                                : 'A' + column + 1);
         result << (row + 1);
-    } else if (move == FastBoard::PASS) {
+    } 
+    else if (move == FastBoard::PASS) {
         result << "pass";
-    } else if (move == FastBoard::RESIGN) {
+    } 
+    else if (move == FastBoard::RESIGN) {
         result << "resign";
-    } else {
+    }
+    else {
         result << "error";
     }
 
@@ -572,11 +429,6 @@ bool FastBoard::starpoint(const int size, const int x, const int y) {
     return starpoint(size, y * size + x);
 }
 
-int FastBoard::get_prisoners(const int side) const {
-    assert(side == WHITE || side == BLACK);
-
-    return m_prisoners[side];
-}
 
 int FastBoard::get_to_move() const {
     return m_tomove;
@@ -594,24 +446,6 @@ void FastBoard::set_to_move(const int tomove) {
     m_tomove = tomove;
 }
 
-//This returns a connected group of stones starting from vertex
-std::string FastBoard::get_string(const int vertex) const {
-    std::string result;
-
-    int start = m_parent[vertex];
-    int newpos = start;
-
-    do {
-        result += move_to_text(newpos) + " ";
-        newpos = m_next[newpos];
-    } while (newpos != start);
-
-    // eat last space
-    assert(result.size() > 0);
-    result.resize(result.size() - 1);
-
-    return result;
-}
 
 std::string FastBoard::get_stone_list() const {
     std::string result;

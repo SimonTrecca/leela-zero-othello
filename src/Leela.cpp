@@ -54,7 +54,7 @@ using namespace Utils;
 
 static void license_blurb() {
     printf(
-        "Leela Zero %s  Copyright (C) 2017-2019  Gian-Carlo Pascutto and contributors\n"
+        "Leela Zero %s  Copyright (C) 2017-2019  Gian-Carlo Pascutto and contributors and Epimetheus\n"
         "This program comes with ABSOLUTELY NO WARRANTY.\n"
         "This is free software, and you are welcome to redistribute it\n"
         "under certain conditions; see the COPYING file for details.\n\n",
@@ -560,7 +560,7 @@ int main(int argc, char* argv[]) {
     auto maingame = std::make_unique<GameState>();
 
     /* set board limits */
-    maingame->init_game(BOARD_SIZE, KOMI);
+    maingame->init_game(BOARD_SIZE);
 
     if (cfg_benchmark) {
         cfg_quiet = false;

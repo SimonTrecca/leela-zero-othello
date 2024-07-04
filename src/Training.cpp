@@ -184,7 +184,6 @@ void Training::record(Network& network, const GameState& state,
     const auto result = network.get_output(&state, Network::Ensemble::DIRECT,
                                            Network::IDENTITY_SYMMETRY);
     step.net_winrate = result.winrate;
-
     // Ottiene il miglior figlio radice per il giocatore corrente
     const auto& best_node = root.get_best_root_child(step.to_move);
     step.root_uct_winrate = root.get_eval(step.to_move);
@@ -208,7 +207,7 @@ void Training::record(Network& network, const GameState& state,
         return;
     }
 
-    // Calcolo delle probabilit‡ scorrendo i figli del nodo radice
+    // Calcolo delle probabilit√† scorrendo i figli del nodo radice
     for (const auto& child : root.get_children()) {
         auto prob = static_cast<float>(child->get_visits() / sum_visits);
         auto move = child->get_move();
@@ -344,7 +343,7 @@ void Training::process_game(GameState& state, size_t& train_pos,
     state.rewind();
 
     // Continua fino a che ci sono mosse disponibili e
-    // fino a quando counter non supera (o Ë uguale) al 
+    // fino a quando counter non supera (o √® uguale) al 
     // numero totale delle mosse nel vettore tree_moves
     do {
         // Informazioni sulla mossa seguente
@@ -368,7 +367,7 @@ void Training::process_game(GameState& state, size_t& train_pos,
         }
 
         // Contiene le informazioni sullo stato del gioco
-        // e sulla probabilit‡ associata alla mossa
+        // e sulla probabilit√† associata alla mossa
         auto step = TimeStep{};
         step.to_move = to_move;
         step.planes = get_planes(&state);

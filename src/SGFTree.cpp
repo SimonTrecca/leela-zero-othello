@@ -43,7 +43,6 @@
 
 #include "FullBoard.h"
 #include "GTP.h"
-#include "KoState.h"
 #include "SGFParser.h"
 #include "Utils.h"
 
@@ -56,11 +55,11 @@ void SGFTree::init_state() {
     // Initialize with defaults.
     // The SGF might be missing boardsize or komi
     // which means we'll never initialize properly.
-    m_state.init_game(std::min(BOARD_SIZE, 19), KOMI);
+    m_state.init_game(std::min(BOARD_SIZE, 19));
 }
 
 // Provides the current state of the game
-const KoState* SGFTree::get_state() const {
+const FastState* SGFTree::get_state() const {
     assert(m_initialized);
     return &m_state;
 }
@@ -180,7 +179,7 @@ void SGFTree::populate_states() {
         // If valid, initialize the game with it + default KOMI value
         if (bsize == BOARD_SIZE) {
             // Assume default komi in config.h if not specified
-            m_state.init_game(bsize, KOMI);
+            m_state.init_game(bsize);
             valid_size = true;
         }
         else {
@@ -191,7 +190,7 @@ void SGFTree::populate_states() {
     // Komi: points given to the second player for disadvantage (not starting first).
     // Search for the Komi value in the file, convert it to floating point, and use it to
     // initialize the game along with the board size (if valid).
-    it = m_properties.find("KM");
+    it = m_properties.find("KM"); //tochange
     if (it != end(m_properties)) {
         const auto foo = it->second;
         std::istringstream strm(foo);
@@ -204,7 +203,7 @@ void SGFTree::populate_states() {
             bsize = m_state.board.get_boardsize();
         }
         if (bsize == BOARD_SIZE) {
-            m_state.init_game(bsize, komi);
+            m_state.init_game(bsize);
             m_state.set_handicap(handicap);
         }
         else {
@@ -508,7 +507,6 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     std::string moves;
 
     // Initialization of variables (komi, board size, and date)
-    auto komi = state->get_komi();
     auto size = state->board.get_boardsize();
     time_t now;
     time(&now);
@@ -519,7 +517,6 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     header.append("(;GM[1]FF[4]RU[Chinese]");
     header.append("DT[" + std::string(timestr) + "]");
     header.append("SZ[" + std::to_string(size) + "]");
-    header.append("KM[" + str(boost::format("%.1f") % komi) + "]");
     header.append(state->get_timecontrol().to_text_sgf());
 
     // Program name
@@ -598,13 +595,13 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
 
     // If no player resigned, calculate the game score.
     if (!state->has_resigned()) {
-        float score = state->final_score();
+        auto score = state->final_score();
 
-        if (score > 0.0f) {
-            header.append("RE[B+" + str(boost::format("%.1f") % score) + "]");
+        if (score.first > score.second) {
+            header.append("RE[W+" + str(boost::format("%d") % score.first) + "]");
         }
-        else if (score < 0.0f) {
-            header.append("RE[W+" + str(boost::format("%.1f") % -score) + "]");
+        else if (score.first < score.second) {
+            header.append("RE[B+" + str(boost::format("%d") % score.second) + "]");
         }
         else {
             header.append("RE[0]");

@@ -560,7 +560,7 @@ int main(int argc, char* argv[]) {
     auto maingame = std::make_unique<GameState>();
 
     /* set board limits */
-    maingame->init_game(BOARD_SIZE);
+    maingame->init_game(BOARD_SIZE, KOMI);
 
     if (cfg_benchmark) {
         cfg_quiet = false;

@@ -41,11 +41,12 @@
 #include "FullBoard.h"
 #include "Network.h"
 #include "UCTSearch.h"
+#include "Utils.h"
 
 //This class is an extension of class KoState
 //Initializes the game by initializing a kostate and other variables like time lcock and previous states
-void GameState::init_game(const int size) {
-    FastState::init_game(size);
+void GameState::init_game(const int size, const float komi) {
+    FastState::init_game(size, komi);
 
     m_game_history.clear(); //m_game_history is a vector or kostates
     m_game_history.emplace_back(std::make_shared<FastState>(*this));
@@ -188,135 +189,37 @@ void GameState::anchor_game_history() {
     m_game_history.clear();
     m_game_history.emplace_back(std::make_shared<FastState>(*this));
 }
-
+//here
 //this sets up a handicap
 bool GameState::set_fixed_handicap(const int handicap) {
-    if (!valid_handicap(handicap)) {
+    if (handicap<1 || handicap>4) {
         return false;
     }
 
     int board_size = board.get_boardsize();
-    int high = board_size >= 13 ? 3 : 2;
-    int mid = board_size / 2;
-
-    int low = board_size - 1 - high;
-    if (handicap >= 2) {
-        play_move(FastBoard::BLACK, board.get_vertex(low, low));
-        play_move(FastBoard::BLACK, board.get_vertex(high, high));
+      
+    if (handicap >= 1 && board.get_state(board.get_vertex(0, 0)) == FastBoard::EMPTY) {
+        play_move(FastBoard::WHITE, board.get_vertex(0, 0));
     }
 
-    if (handicap >= 3) {
-        play_move(FastBoard::BLACK, board.get_vertex(high, low));
+    if (handicap >= 2 && board.get_state(board.get_vertex(0, board_size - 1)) == FastBoard::EMPTY) {
+        play_move(FastBoard::WHITE, board.get_vertex(0, board_size-1));
     }
 
-    if (handicap >= 4) {
-        play_move(FastBoard::BLACK, board.get_vertex(low, high));
+
+    if (handicap >= 3 && board.get_state(board.get_vertex(board_size - 1, board_size - 1)) == FastBoard::EMPTY) {
+        play_move(FastBoard::WHITE, board.get_vertex(board_size-1, board_size-1));
     }
 
-    if (handicap >= 5 && handicap % 2 == 1) {
-        play_move(FastBoard::BLACK, board.get_vertex(mid, mid));
+    if (handicap >= 4 && board.get_state(board.get_vertex(board_size - 1, 0))==FastBoard::EMPTY) {
+        play_move(FastBoard::WHITE, board.get_vertex(board_size-1, 0));
     }
-
-    if (handicap >= 6) {
-        play_move(FastBoard::BLACK, board.get_vertex(low, mid));
-        play_move(FastBoard::BLACK, board.get_vertex(high, mid));
-    }
-
-    if (handicap >= 8) {
-        play_move(FastBoard::BLACK, board.get_vertex(mid, low));
-        play_move(FastBoard::BLACK, board.get_vertex(mid, high));
-    }
-
-    board.set_to_move(FastBoard::WHITE);
 
     anchor_game_history();
 
     set_handicap(handicap);
 
     return true;
-}
-
-int GameState::set_fixed_handicap_2(const int handicap) {
-    int board_size = board.get_boardsize();
-    int low = board_size >= 13 ? 3 : 2;
-    int mid = board_size / 2;
-    int high = board_size - 1 - low;
-
-    int interval = (high - mid) / 2;
-    int placed = 0;
-
-    while (interval >= 3) {
-        for (int i = low; i <= high; i += interval) {
-            for (int j = low; j <= high; j += interval) {
-                if (placed >= handicap) return placed;
-                if (board.get_state(i - 1, j - 1) != FastBoard::EMPTY) continue;
-                if (board.get_state(i - 1, j) != FastBoard::EMPTY) continue;
-                if (board.get_state(i - 1, j + 1) != FastBoard::EMPTY) continue;
-                if (board.get_state(i, j - 1) != FastBoard::EMPTY) continue;
-                if (board.get_state(i, j) != FastBoard::EMPTY) continue;
-                if (board.get_state(i, j + 1) != FastBoard::EMPTY) continue;
-                if (board.get_state(i + 1, j - 1) != FastBoard::EMPTY) continue;
-                if (board.get_state(i + 1, j) != FastBoard::EMPTY) continue;
-                if (board.get_state(i + 1, j + 1) != FastBoard::EMPTY) continue;
-                play_move(FastBoard::BLACK, board.get_vertex(i, j));
-                placed++;
-            }
-        }
-        interval = interval / 2;
-    }
-
-    return placed;
-}
-
-bool GameState::valid_handicap(const int handicap) {
-    int board_size = board.get_boardsize();
-
-    if (handicap < 2 || handicap > 9) {
-        return false;
-    }
-    if (board_size % 2 == 0 && handicap > 4) {
-        return false;
-    }
-    if (board_size == 7 && handicap > 4) {
-        return false;
-    }
-    if (board_size < 7 && handicap > 0) {
-        return false;
-    }
-
-    return true;
-}
-
-void GameState::place_free_handicap(int stones, Network& network) {
-    int limit = board.get_boardsize() * board.get_boardsize();
-    if (stones > limit / 2) {
-        stones = limit / 2;
-    }
-
-    int orgstones = stones;
-
-    int fixplace = std::min(9, stones);
-
-    set_fixed_handicap(fixplace);
-    stones -= fixplace;
-
-    stones -= set_fixed_handicap_2(stones);
-
-    for (int i = 0; i < stones; i++) {
-        auto search = std::make_unique<UCTSearch>(*this, network);
-        auto move = search->think(FastBoard::BLACK, UCTSearch::NOPASS);
-        play_move(FastBoard::BLACK, move);
-    }
-
-    if (orgstones) {
-        board.set_to_move(FastBoard::WHITE);
-    } else {
-        board.set_to_move(FastBoard::BLACK);
-    }
-
-    anchor_game_history();
-
-    set_handicap(orgstones);
 }
 
 const FullBoard& GameState::get_past_board(const int moves_ago) const {

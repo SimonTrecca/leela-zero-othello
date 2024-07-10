@@ -48,11 +48,9 @@ public:
         *(static_cast<FastState*>(this)) = *rhs;
         anchor_game_history();
     }
-    void init_game(int size);
+    void init_game(int size, float komi);
     void reset_game();
     bool set_fixed_handicap(int stones);
-    int set_fixed_handicap_2(int stones);
-    void place_free_handicap(int stones, Network& network);
     void anchor_game_history();
 
     void rewind(); /* undo infinite */
@@ -76,9 +74,6 @@ public:
     void display_state();
     bool has_resigned() const;
     int who_resigned() const;
-
-private:
-    bool valid_handicap(int stones);
 
     std::vector<std::shared_ptr<const FastState>> m_game_history;
     TimeControl m_timecontrol;

@@ -42,15 +42,20 @@
 
 using namespace Utils;
 
-void FastState::init_game(const int size) {
+void FastState::init_game(const int size, const float komi) {
     board.reset_board(size);
 
     m_movenum = 0;
     m_lastmove = FastBoard::NO_VERTEX;
     m_handicap = 0;
     m_passes = 0;
+    m_komi = komi;
 
     return;
+}
+
+void FastState::set_komi(const float komi) {
+    m_komi = komi;
 }
 
 void FastState::reset_game() {
@@ -111,6 +116,9 @@ int FastState::get_last_move() const {
 int FastState::get_passes() const {
     return m_passes;
 }
+float FastState::get_komi() const {
+    return m_komi;
+}
 
 void FastState::set_passes(const int val) {
     m_passes = val;
@@ -129,16 +137,19 @@ void FastState::set_to_move(const int tom) {
     board.set_to_move(tom);
 }
 
+
+
 void FastState::display_state() {
-    myprintf("\nPasses: %d            Black (X) Pawns: %d\n",
-             m_passes, board.area_score().first);
+    auto points = board.area_score(get_komi());
+    myprintf("\nPasses: %d            Black (X) Pawns: %.1f\n",
+             m_passes, points.first);
     if (board.black_to_move()) {
         myprintf("Black (X) to move");
     } else {
         myprintf("White (O) to move");
     }
-    myprintf("    White (O) Pawns: %d\n",
-             board.area_score().second);
+    myprintf("    White (O) Pawns: %.1f\n",
+             points.second);
 
     board.display_board(get_last_move());
 }
@@ -147,8 +158,8 @@ std::string FastState::move_to_text(const int move) const {
     return board.move_to_text(move);
 }
 
-std::pair<int, int> FastState::final_score() const {
-    return board.area_score();
+std::pair<float, float> FastState::final_score() const {
+    return board.area_score(get_komi());
 }
 
 

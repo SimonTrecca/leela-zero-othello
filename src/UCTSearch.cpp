@@ -134,6 +134,9 @@ bool UCTSearch::advance_to_new_rootstate() {
         // No current state
         return false;
     }
+    if (m_rootstate.get_komi() != m_last_rootstate->get_komi()) {
+        return false;
+    }
 
     auto depth =
         int(m_rootstate.get_movenum() - m_last_rootstate->get_movenum());

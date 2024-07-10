@@ -247,7 +247,7 @@ int TimeControl::max_time_for_move(const int boardsize, const int color, const s
     int inc_time = std::max(move_increment - cfg_lagbuffer_cs, 0);
 
     // Return the sum of base time and increment
-    return base_time + inc_time;
+    return (base_time + inc_time)/100;
 }
 
 

@@ -405,8 +405,6 @@ const std::string GTP::s_commands[] = {
     "last_move",
     "move_history",
     "clear_cache",
-    "place_free_handicap",
-    "set_free_handicap",
     "loadsgf",
     "printsgf",
     "kgs-genmove_cleanup",
@@ -540,7 +538,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
                 gtp_fail_printf(id, "unacceptable size");
             } else {
                 Training::clear_training();
-                game.init_game(tmp);
+                game.init_game(tmp, KOMI);
                 gtp_printf(id, "");
             }
         } else {
@@ -721,12 +719,12 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         game.display_state();
         return;
     } else if (command.find("final_score") == 0) {
-        std::pair<int,int> ftmp = game.final_score();
+        auto ftmp = game.final_score();
         /* white wins */
         if (ftmp.first < ftmp.second) {
-            gtp_printf(id, "W+%d", ftmp.second);
+            gtp_printf(id, "W+%.1f", ftmp.second);
         } else if (ftmp.first > ftmp.second) {
-            gtp_printf(id, "B+%d", ftmp.first);
+            gtp_printf(id, "B+%.1f", ftmp.first);
         } else {
             gtp_printf(id, "0");
         }
@@ -835,7 +833,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
 
         gtp_printf(id, "");
         return;
-    } else if (command.find("fixed_handicap") == 0) { //sets up handicap stones for black
+    } else if (command.find("fixed_handicap") == 0) { //sets up handicap stones for second
         std::istringstream cmdstream(command);
         std::string tmp;
         int stones;
@@ -882,48 +880,7 @@ void GTP::execute(GameState& game, const std::string& xinput) {
         s_network->nncache_clear();
         gtp_printf(id, "");
         return;
-    } else if (command.find("place_free_handicap") == 0) { //places random free handicap stones for black
-        std::istringstream cmdstream(command);
-        std::string tmp;
-        int stones;
-
-        cmdstream >> tmp; // eat "place_free_handicap"
-        cmdstream >> stones;
-
-        if (!cmdstream.fail()) {
-            game.place_free_handicap(stones, *s_network);
-            auto stonestring = game.board.get_stone_list();
-            gtp_printf(id, "%s", stonestring.c_str());
-        } else {
-            gtp_fail_printf(id, "Not a valid number of handicap stones");
-        }
-
-        return;
-    } else if (command.find("set_free_handicap") == 0) { //adds an handicap to black
-        std::istringstream cmdstream(command);
-        std::string tmp;
-
-        cmdstream >> tmp; // eat set_free_handicap
-
-        do {
-            std::string vertex;
-
-            cmdstream >> vertex;
-
-            if (!cmdstream.fail()) {
-                if (!game.play_textmove("black", vertex)) {
-                    gtp_fail_printf(id, "illegal move");
-                } else {
-                    game.set_handicap(game.get_handicap() + 1);
-                }
-            }
-        } while (!cmdstream.fail());
-
-        std::string stonestring = game.board.get_stone_list();
-        gtp_printf(id, "%s", stonestring.c_str());
-
-        return;
-    } else if (command.find("loadsgf") == 0) { //loads a game state from an sgf file
+    }  else if (command.find("loadsgf") == 0) { //loads a game state from an sgf file
         std::istringstream cmdstream(command);
         std::string tmp, filename;
         int movenum;

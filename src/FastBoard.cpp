@@ -226,7 +226,7 @@ void FastBoard::flip_neighbour(const int vtx, const int color) { //instead of re
 }
 
 // Gives the scores for each player
-std::pair<int, int> FastBoard::area_score() const {
+std::pair<float, float> FastBoard::area_score(const float komi) const {
     int black_count=0, white_count=0;
     
     for (int i = 0; i < m_boardsize; i++) {
@@ -241,7 +241,7 @@ std::pair<int, int> FastBoard::area_score() const {
         }
     }
     
-    return std::make_pair(black_count, white_count);
+    return std::make_pair(black_count, white_count+komi);
 }
 
 //This function displays the board, marking the last move played

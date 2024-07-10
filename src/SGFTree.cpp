@@ -55,7 +55,7 @@ void SGFTree::init_state() {
     // Initialize with defaults.
     // The SGF might be missing boardsize or komi
     // which means we'll never initialize properly.
-    m_state.init_game(std::min(BOARD_SIZE, 19));
+    m_state.init_game(std::min(BOARD_SIZE, 19), KOMI);
 }
 
 // Provides the current state of the game
@@ -179,7 +179,7 @@ void SGFTree::populate_states() {
         // If valid, initialize the game with it + default KOMI value
         if (bsize == BOARD_SIZE) {
             // Assume default komi in config.h if not specified
-            m_state.init_game(bsize);
+            m_state.init_game(bsize, KOMI);
             valid_size = true;
         }
         else {
@@ -203,7 +203,7 @@ void SGFTree::populate_states() {
             bsize = m_state.board.get_boardsize();
         }
         if (bsize == BOARD_SIZE) {
-            m_state.init_game(bsize);
+            m_state.init_game(bsize,komi);
             m_state.set_handicap(handicap);
         }
         else {
@@ -507,6 +507,7 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     std::string moves;
 
     // Initialization of variables (komi, board size, and date)
+    auto komi = state->get_komi();
     auto size = state->board.get_boardsize();
     time_t now;
     time(&now);
@@ -517,6 +518,7 @@ std::string SGFTree::state_to_string(GameState& pstate, const int compcolor) {
     header.append("(;GM[1]FF[4]RU[Chinese]");
     header.append("DT[" + std::string(timestr) + "]");
     header.append("SZ[" + std::to_string(size) + "]");
+    header.append("KM[" + str(boost::format("%.1f") % komi) + "]");
     header.append(state->get_timecontrol().to_text_sgf());
 
     // Program name

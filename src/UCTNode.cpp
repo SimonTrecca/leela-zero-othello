@@ -91,7 +91,7 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
                               const GameState& state, float& eval,
                               const float min_psa_ratio) {
     // no successors in final state
-    if (state.get_passes() > 2) {
+    if (state.get_passes() >= 2) {
         return false;
     }
 
@@ -143,19 +143,22 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
     }
 
     // Always try passes if we're not trying to be clever.
-    auto allow_pass = cfg_dumbpass;
+    //auto allow_pass = cfg_dumbpass;
 
     // Less than 20 available intersections in a 19x19 game.
-    if (int(nodelist.size()) <= std::max(5, BOARD_SIZE)) {
+    /*if (int(nodelist.size()) <= std::max(5, BOARD_SIZE)) {
         allow_pass = true;
-    }
+    }*/
 
-    if (allow_pass) {
+    /*if (state.is_move_legal(to_move, FastBoard::PASS)) {
         // Aggiunge il passaggio alla fine del vettore nodelist
         nodelist.emplace_back(raw_netlist.policy_pass, FastBoard::PASS);
         legal_sum += raw_netlist.policy_pass;
+    }*/
+    if (!state.has_legal_moves(to_move)) {
+        nodelist.emplace_back(raw_netlist.policy_pass, FastBoard::PASS);
+        legal_sum += raw_netlist.policy_pass;
     }
-
     // Controlla che la somma delle probabilità delle mosse
     // contenute dentro nodelist sia pari a 1.0
     if (legal_sum > std::numeric_limits<float>::min()) {

@@ -70,13 +70,15 @@ void FastState::reset_game() {
 void FastState::reset_board() {
     board.reset_board(board.get_boardsize());
 }
-
+bool FastState::has_legal_moves(const int color) const {
+    return board.legal_moves_present(color);
+}
 //checks if the move is legal
 bool FastState::is_move_legal(const int color, const int vertex) const { //tochange
     
-    if (vertex == FastBoard::PASS && board.legal_moves_present(color)) {
+    /*if (vertex == FastBoard::PASS && board.legal_moves_present(color)) {
         return false;
-    }
+    }*/
     
     return !cfg_analyze_tags.is_to_avoid(color, vertex, m_movenum) 
         && (vertex == FastBoard::RESIGN || 

@@ -46,6 +46,7 @@ public:
     void play_move(int vertex);
     void play_move(int color, int vertex);
     bool is_move_legal(int color, int vertex) const;
+    bool has_legal_moves(const int color) const;
     void set_komi(float komi);
     float get_komi() const;
     void set_handicap(int hcap);

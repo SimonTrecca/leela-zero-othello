@@ -270,6 +270,25 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
     } BOOST_SCOPE_EXIT_END
 
     if (node->expandable()) {
+        if (currstate.get_passes() >= 2) {
+            auto score = currstate.final_score();
+            auto relative_score = score.first - score.second;
+            result = SearchResult::from_score(relative_score);
+        } else {
+            float eval;
+            const auto had_children = node->has_children();
+
+            // Careful: create_children() can throw a NetworkHaltException when
+            // another thread requests draining the search.
+            const auto success = node->create_children(
+                m_network, m_nodes, currstate, eval, get_min_psa_ratio());
+            if (!had_children && success) {
+                result = SearchResult::from_eval(eval);
+                new_node = true;
+            }
+        }
+    }
+    /*if (node->expandable()) {
         float eval;
         const auto had_children = node->has_children();
 
@@ -283,7 +302,7 @@ SearchResult UCTSearch::play_simulation(GameState& currstate,
             result = SearchResult::from_eval(eval);
             new_node = true;
         }
-    }
+    }*/
 
     // Il nodo HA figli e non è stato restituito un risultato valido
     // Viene selezionato il prossimo figlio da esplorare (quello migliore)
@@ -531,7 +550,7 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
     auto bestmove = first_child->get_move();
     auto besteval =
         first_child->first_visit() ? 0.5f : first_child->get_raw_eval(color);
-
+    /*
     // do we want to fiddle with the best move because of the rule set?
     if (passflag & UCTSearch::NOPASS) {
         // were we going to pass?
@@ -631,7 +650,7 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
             }
         }
     }
-
+    */
     // if we aren't passing, should we consider resigning?
     if (bestmove != FastBoard::PASS) {
         if (should_resign(passflag, besteval)) {

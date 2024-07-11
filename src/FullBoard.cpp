@@ -171,7 +171,7 @@ bool FullBoard::legal_moves_present(const int color) const{
                 }
             }
         }
-        if (color == WHITE) { //if the player color is white, check if there are black neighbours
+        else if (color == WHITE) { //if the player color is white, check if there are black neighbours
             if (count_neighbours(BLACK, m_empty[i]) > 0) {
                 if (is_play_legal(color, m_empty[i])) {
                     return true;

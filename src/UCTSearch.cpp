@@ -550,9 +550,9 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
     auto bestmove = first_child->get_move();
     auto besteval =
         first_child->first_visit() ? 0.5f : first_child->get_raw_eval(color);
-    /*
+    
     // do we want to fiddle with the best move because of the rule set?
-    if (passflag & UCTSearch::NOPASS) {
+    /*if (passflag & UCTSearch::NOPASS) {
         // were we going to pass?
         // Se la mossa migliore è passare, allora cerco una mossa migliore alternativa
         if (bestmove == FastBoard::PASS) {
@@ -649,8 +649,8 @@ int UCTSearch::get_best_move(const passflag_t passflag) {
                 }
             }
         }
-    }
-    */
+    }*/
+    
     // if we aren't passing, should we consider resigning?
     if (bestmove != FastBoard::PASS) {
         if (should_resign(passflag, besteval)) {

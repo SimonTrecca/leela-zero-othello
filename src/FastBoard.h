@@ -82,7 +82,7 @@ public:
     void set_state(int vertex, vertex_t content);
     std::pair<int, int> get_xy(int vertex) const;
 
-    std::pair<float, float> FastBoard::area_score(float komi) const;
+    std::pair<float, float> area_score(float komi) const;
 
     bool black_to_move() const;
     bool white_to_move() const;

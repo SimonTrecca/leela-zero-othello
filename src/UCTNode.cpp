@@ -150,15 +150,15 @@ bool UCTNode::create_children(Network& network, std::atomic<int>& nodecount,
         allow_pass = true;
     }*/
 
-    /*if (state.is_move_legal(to_move, FastBoard::PASS)) {
+    if (state.is_move_legal(to_move, FastBoard::PASS)) {
         // Aggiunge il passaggio alla fine del vettore nodelist
         nodelist.emplace_back(raw_netlist.policy_pass, FastBoard::PASS);
         legal_sum += raw_netlist.policy_pass;
-    }*/
-    if (!state.has_legal_moves(to_move)) {
+    }
+    /*if (!state.has_legal_moves(to_move)) {
         nodelist.emplace_back(raw_netlist.policy_pass, FastBoard::PASS);
         legal_sum += raw_netlist.policy_pass;
-    }
+    }*/
     // Controlla che la somma delle probabilità delle mosse
     // contenute dentro nodelist sia pari a 1.0
     if (legal_sum > std::numeric_limits<float>::min()) {
